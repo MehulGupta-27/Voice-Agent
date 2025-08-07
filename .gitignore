@@ -1,28 +1,22 @@
-# Python
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 *.pyc
 
-# Virtual Environment
 venv/
 env/
 ENV/
 .venv/
 .ENV/
 
-# dotenv
 .env
 
-# VSCode settings
 .vscode/
 
-# OS-specific
 .DS_Store
 Thumbs.db
 
-# PyInstaller build
 *.spec
 dist/
 build/
@@ -30,7 +24,9 @@ build/
 # Logs
 *.log
 
-# Node.js (if using npm or frontend build tools later)
 node_modules/
 package-lock.json
 yarn.lock
+
+# uploads/
+uploads/
