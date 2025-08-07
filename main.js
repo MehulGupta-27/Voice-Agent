@@ -113,7 +113,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let mediaRecorder;
     let audioChunks = [];
 
-    startBtn.addEventListener("click", async () => {
+    startBtn.addEventListener("click", async (event) => {
+        event.preventDefault();
         try {
             console.log("Start recording clicked");
             recordingResult.innerHTML = '<div class="status-message status-recording">🎤 Recording in progress...</div>';
@@ -179,18 +180,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 console.log('Recording details displayed - should stay visible');
 
+                const recordingHTML = recordingResult.innerHTML;
+                
+                const protectRecording = () => {
+                    if (!recordingResult.innerHTML.includes('Recording Complete')) {
+                        console.log('🔄 Restoring recording details...');
+                        recordingResult.innerHTML = recordingHTML;
+                    }
+                };
+
+                const protectionInterval = setInterval(protectRecording, 100);
+                setTimeout(() => clearInterval(protectionInterval), 10000);
+
                 setTimeout(() => {
                     if (recordingResult.innerHTML.includes('Recording Complete')) {
                         console.log('✅ Recording details still visible after 2 seconds');
                     } else {
                         console.log('❌ Recording details disappeared!');
                         console.log('Current content:', recordingResult.innerHTML);
+                        recordingResult.innerHTML = recordingHTML;
                     }
                 }, 2000);
 
-                setTimeout(async () => {
-                    await uploadAudio(audioBlob);
-                }, 1000);
+                console.log('Recording complete - upload functionality disabled as requested');
             };
 
             mediaRecorder.start();
@@ -203,7 +215,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    stopBtn.addEventListener("click", () => {
+    stopBtn.addEventListener("click", (event) => {
+        event.preventDefault();
         console.log("Stop recording clicked");
         if (mediaRecorder && mediaRecorder.state !== "inactive") {
             mediaRecorder.stop();

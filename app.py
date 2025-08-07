@@ -17,7 +17,7 @@ try:
 except Exception as e:
     print(f"❌ Error creating uploads directory: {e}")
     uploads_dir = Path(".")
-
+ 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
