@@ -13,32 +13,93 @@ body {
 
 .main {
     min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     padding: 20px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
-.box {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    min-height: 600px;
-    max-height: 95vh;
-    width: 100%;
-    max-width: 600px;
+.header-section {
+    text-align: center;
+    margin-bottom: 30px;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(20px);
-    border-radius: 24px;
-    padding: 40px 30px;
-    box-shadow:
-        0 20px 40px rgba(0, 0, 0, 0.1),
-        0 0 0 1px rgba(255, 255, 255, 0.2);
-    overflow-y: auto;
-    animation: slideUp 0.6s ease-out;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    animation: slideDown 0.6s ease-out;
+    width: 100%;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 30px;
+    box-sizing: border-box;
 }
+
+.header-section h1 {
+    color: #4c51bf;
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.header-section h2 {
+    color: #6b7280;
+    font-size: 20px;
+    font-weight: 500;
+    margin: 0;
+}
+
+.content-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+
+.section-box {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow:
+        0 10px 30px rgba(0, 0, 0, 0.1),
+        0 0 0 1px rgba(255, 255, 255, 0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    animation: slideUp 0.6s ease-out;
+    min-height: 200px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.section-box:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.section-header {
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+}
+
+.section-header h3 {
+    color: #1f2937;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.tts-section {
+    border-left: 4px solid #3b82f6;
+}
+
+.voice-section {
+    border-left: 4px solid #10b981;
+}
+
 
 @keyframes slideUp {
     from {
@@ -52,21 +113,18 @@ body {
     }
 }
 
-h1 {
-    color: #4c51bf;
-    font-size: 28px;
-    font-weight: 700;
-    margin-bottom: 8px;
-    text-align: center;
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-h2 {
-    color: #6b7280;
-    font-size: 18px;
-    font-weight: 500;
-    margin-bottom: 30px;
-    text-align: center;
-}
 
 hr {
     width: 100%;
@@ -77,7 +135,7 @@ hr {
 }
 
 form {
-    margin: 20px 0;
+    margin: 0;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -187,7 +245,7 @@ form {
     display: flex;
     gap: 12px;
     justify-content: center;
-    margin-bottom: 20px;
+    margin-bottom: 0;
     flex-wrap: wrap;
 }
 
@@ -415,21 +473,52 @@ audio {
     font-style: italic;
 }
 
-@media (max-width: 640px) {
-    .box {
-        margin: 10px;
-        padding: 24px 20px;
-        border-radius: 20px;
+@media (max-width: 768px) {
+    .content-layout {
+        gap: 20px;
+    }
+
+    .section-box {
+        padding: 20px;
+        min-height: 150px;
+    }
+
+    .header-section {
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .header-section h1 {
+        font-size: 28px;
+    }
+
+    .header-section h2 {
+        font-size: 18px;
     }
 
     .recording-controls {
         flex-direction: column;
         align-items: center;
+        gap: 10px;
     }
 
     #startRecording,
     #stopRecording {
         width: 100%;
-        max-width: 200px;
+        max-width: 250px;
+    }
+}
+
+@media (max-width: 480px) {
+    .main {
+        padding: 10px;
+    }
+
+    .content-layout {
+        gap: 15px;
+    }
+
+    .section-box {
+        padding: 15px;
     }
 }

@@ -4,28 +4,39 @@
     <link rel="stylesheet" href="style.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>30 Days of Voice Agents - Day 5</title>
+    <title>30 Days of Voice Agents - Day 6</title>
 </head>
 <body>
     <div class="main">
-        <div class="box">
+        <div class="header-section">
             <h1>30 Days of Voice Agents</h1>
-            <h2>Day-5 Send Audio to Server</h2>
-            <form>
-                <input id="textInput" placeholder="Enter Text to Convert to Speech">
-                <button type="button" id="generateBtn">Generate Audio</button>
-            </form>
-            <div id="audioResult"></div>
+            <h2>Day-6 Server-Side Transcription</h2>
+        </div>
 
-            <hr>
+        <div class="content-layout">
+            <div class="section-box tts-section">
+                <div class="section-header">
+                    <h3>🎵 Text-to-Speech Generator</h3>
+                </div>
+                <form>
+                    <input id="textInput" placeholder="Enter Text to Convert to Speech">
+                    <button type="button" id="generateBtn">Generate Audio</button>
+                </form>
+                <div id="audioResult"></div>
+            </div>
 
-            <h1>Echo Bot</h1>
-            <div class="echo-bot">
+            <div class="section-box voice-section">
+                <div class="section-header">
+                    <h3>🎤 Voice Recording & Transcription</h3>
+                </div>
+                
                 <div class="recording-controls">
                     <button type="button" id="startRecording">🎤 Start Recording</button>
                     <button type="button" id="stopRecording" disabled>⏹️ Stop Recording</button>
                 </div>
+                
                 <div id="recordingResult"></div>
+                
                 <div id="uploadResults"></div>
             </div>
         </div>

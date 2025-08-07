@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import os
 import requests
 from pathlib import Path
+import assemblyai as aai
 
 load_dotenv()
 
@@ -17,6 +18,9 @@ try:
 except Exception as e:
     print(f"❌ Error creating uploads directory: {e}")
     uploads_dir = Path(".")
+
+aai.settings.api_key = os.getenv("ASSEMBLYAI_API_KEY")
+transcriber = aai.Transcriber()
  
 app.add_middleware(
     CORSMiddleware,
@@ -89,3 +93,41 @@ async def upload_audio(file: UploadFile = File(...)):
         print(f"Error occurred: {error_response}")
         return error_response
 
+@app.post("/transcribe/file")
+async def transcribe_file(file: UploadFile = File(...)):
+    try:
+        print(f"Received file for transcription: {file.filename}, Content-Type: {file.content_type}")
+        
+        audio_data = await file.read()
+        print(f"Audio data size: {len(audio_data)} bytes")
+        
+        print("Starting transcription with AssemblyAI...")
+        transcript = transcriber.transcribe(audio_data)
+        
+        if transcript.status == aai.TranscriptStatus.error:
+            print(f"Transcription failed: {transcript.error}")
+            return {
+                "error": f"Transcription failed: {transcript.error}",
+                "status": "error"
+            }
+        
+        print(f"Transcription completed successfully")
+        print(f"Transcript text: {transcript.text[:100]}...")
+        
+        response_data = {
+            "transcript": transcript.text,
+            "status": "completed",
+            "filename": file.filename,
+            "audio_duration": transcript.audio_duration,
+            "confidence": getattr(transcript, 'confidence', None),
+            "words_count": len(transcript.text.split()) if transcript.text else 0
+        }
+        
+        return response_data
+        
+    except Exception as e:
+        print(f"Error during transcription: {str(e)}")
+        return {
+            "error": f"Transcription error: {str(e)}",
+            "status": "error"
+        }
