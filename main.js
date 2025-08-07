@@ -6,11 +6,6 @@ document.addEventListener("DOMContentLoaded", () => {
     generateBtn.addEventListener("click", async () => {
         const text = textInput.value.trim();
 
-        // if (!text) {
-        //     alert("Please enter some text.");
-        //     return;
-        // }
-
         const payload = {
             text: text,
             voiceId: "en-US-marcus",
@@ -32,7 +27,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const audioUrl = result.audio?.audioFile;
 
             if (audioUrl) {
-                // Generate filename for TTS audio
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                 const ttsFilename = `tts_audio_${timestamp}.mp3`;
 
@@ -111,7 +105,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Recording functionality
     const startBtn = document.getElementById("startRecording");
     const stopBtn = document.getElementById("stopRecording");
     const recordingResult = document.getElementById("recordingResult");
@@ -143,13 +136,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                 const audioUrl = URL.createObjectURL(audioBlob);
 
-                // Generate filename with timestamp
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                 const filename = `recording_${timestamp}.webm`;
 
                 console.log('Audio blob created:', audioBlob.size, 'bytes');
 
-                // Create simple, stable HTML without complex CSS classes
                 recordingResult.innerHTML = `
                     <div style="
                         background: #f0fff4;
@@ -188,7 +179,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 console.log('Recording details displayed - should stay visible');
 
-                // Test if content is still there after 2 seconds
                 setTimeout(() => {
                     if (recordingResult.innerHTML.includes('Recording Complete')) {
                         console.log('✅ Recording details still visible after 2 seconds');
@@ -198,7 +188,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 }, 2000);
 
-                // Upload the recorded audio to server
                 setTimeout(async () => {
                     await uploadAudio(audioBlob);
                 }, 1000);
@@ -224,7 +213,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Upload function - simplified to avoid interference
     async function uploadAudio(audioBlob) {
         console.log('Starting upload process...');
 
@@ -243,7 +231,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
             console.log('Uploading file:', filename, 'Size:', audioBlob.size);
 
-            // Show upload status with new styling
             uploadResults.innerHTML = '<div class="status-message status-uploading">🔄 Uploading audio to server...</div>';
 
             const response = await fetch('http://localhost:8000/upload-audio', {
@@ -255,7 +242,6 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log('Upload response:', result);
 
             if (response.ok && result.filename) {
-                // SUCCESS - Show permanent results with new styling
                 uploadResults.innerHTML = `
                     <div class="result-card success">
                         <h3 style="color: #10b981;">✅ Upload Successful!</h3>
@@ -274,7 +260,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.log('Upload successful - permanent display created');
 
             } else {
-                // ERROR with new styling
                 uploadResults.innerHTML = `
                     <div class="result-card error">
                         <h3 style="color: #ef4444;">❌ Upload Failed</h3>

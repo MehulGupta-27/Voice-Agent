@@ -10,7 +10,6 @@ load_dotenv()
 
 app = FastAPI()
 
-# Create uploads directory if it doesn't exist
 uploads_dir = Path("uploads")
 try:
     uploads_dir.mkdir(exist_ok=True)
@@ -56,7 +55,6 @@ async def generate_audio(req: TTSRequest):
     }
 
     response = requests.post(url, headers=headers, json=payload)
-    # print("Murf Response:", response.status_code, response.text)
 
 
     return {
