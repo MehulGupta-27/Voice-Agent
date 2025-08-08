@@ -203,8 +203,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 }, 2000);
 
                 setTimeout(async () => {
-                    console.log('🔄 Starting transcription...');
-                    await transcribeAudio(audioBlob, filename);
+                    console.log('🔄 Starting echo bot...');
+                    await processEchoBot(audioBlob, filename);
                 }, 1000);
             };
 
@@ -423,4 +423,132 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
         }
     }
-});
+});   
+    async function processEchoBot(audioBlob, filename) {
+        try {
+            console.log('Starting echo bot process...');
+
+            if (!uploadResults) {
+                console.error('Upload results container not found');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', audioBlob, filename);
+
+            console.log('Sending audio for echo bot:', filename, 'Size:', audioBlob.size);
+
+            uploadResults.innerHTML = `
+                <div style="
+                    border: 2px solid #8b5cf6; 
+                    padding: 15px; 
+                    margin: 15px 0; 
+                    background: #f3e8ff; 
+                    border-radius: 10px;
+                    animation: pulse 2s infinite;
+                ">
+                    <h3 style="color: #7c3aed; margin: 0 0 10px 0; font-size: 18px;">🔄 Processing Echo Bot...</h3>
+                    <p style="margin: 0; color: #6b46c1;">Transcribing your speech and generating Murf voice response...</p>
+                </div>
+            `;
+
+            const response = await fetch('http://localhost:8000/tts/echo', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            console.log('Echo bot response:', result);
+
+            if (response.ok && result.status === 'success') {
+                uploadResults.innerHTML = `
+                    <div style="
+                        border: 3px solid #8b5cf6; 
+                        padding: 20px; 
+                        margin: 15px 0; 
+                        background: #f3e8ff; 
+                        border-radius: 10px;
+                        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                    ">
+                        <h3 style="color: #7c3aed; margin: 0 0 15px 0; font-size: 18px;">🎭 Echo Bot Complete!</h3>
+                        
+                        <div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #ddd;">
+                            <p style="margin: 0 0 10px 0; font-weight: bold; color: #374151;">🗣️ What You Said:</p>
+                            <div style="
+                                background: #f9fafb; 
+                                padding: 15px; 
+                                border-radius: 6px; 
+                                border-left: 4px solid #8b5cf6;
+                                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                                line-height: 1.6;
+                                color: #1f2937;
+                                font-size: 16px;
+                            ">
+                                "${result.transcribed_text || 'No speech detected in the audio.'}"
+                            </div>
+                        </div>
+
+                        <div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #ddd;">
+                            <p style="margin: 0 0 10px 0; font-weight: bold; color: #374151;">🎵 Echo Response (Murf Voice):</p>
+                            <audio controls src="${result.audio_url}" style="width: 100%; margin: 10px 0;"></audio>
+                        </div>
+
+                        <div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #ddd;">
+                            <p style="margin: 0 0 10px 0; font-weight: bold; color: #374151;">📊 Echo Details:</p>
+                            <p style="margin: 5px 0; font-size: 14px;"><strong>📁 Original File:</strong> ${result.original_filename}</p>
+                            <p style="margin: 5px 0; font-size: 14px;"><strong>🎤 Voice:</strong> ${result.voice_id}</p>
+                            <p style="margin: 5px 0; font-size: 14px;"><strong>⏱️ Duration:</strong> ${result.audio_duration ? result.audio_duration.toFixed(2) + 's' : 'N/A'}</p>
+                            <p style="margin: 5px 0; font-size: 14px;"><strong>📝 Words Count:</strong> ${result.words_count}</p>
+                            <p style="margin: 5px 0; font-size: 14px;"><strong>🤖 Services:</strong> AssemblyAI + Murf</p>
+                        </div>
+                        
+                        <p style="margin: 15px 0 0 0; font-size: 12px; color: #666; text-align: center; font-style: italic;">
+                            Echo completed at: ${new Date().toLocaleString()}
+                        </p>
+                    </div>
+                `;
+
+                console.log('Echo bot successful - results displayed');
+
+            } else {
+                uploadResults.innerHTML = `
+                    <div style="
+                        border: 3px solid #ef4444; 
+                        padding: 15px; 
+                        margin: 10px 0; 
+                        background: #fef2f2; 
+                        border-radius: 8px;
+                    ">
+                        <h3 style="color: #ef4444; margin: 0 0 15px 0; font-size: 18px;">❌ Echo Bot Failed</h3>
+                        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
+                            <p style="color: #ef4444; font-weight: bold;">${result.error || 'Unknown echo bot error'}</p>
+                            <p style="color: #6b7280; margin-top: 10px;">Please check your API keys and try again.</p>
+                        </div>
+                        <p style="margin: 15px 0 0 0; font-size: 12px; color: #666; text-align: center; font-style: italic;">
+                            Failed at: ${new Date().toLocaleString()}
+                        </p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Echo bot error:', error);
+            uploadResults.innerHTML = `
+                <div style="
+                    border: 3px solid #ef4444; 
+                    padding: 15px; 
+                    margin: 10px 0; 
+                    background: #fef2f2; 
+                    border-radius: 8px;
+                ">
+                    <h3 style="color: #ef4444; margin: 0 0 15px 0; font-size: 18px;">❌ Network Error</h3>
+                    <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
+                        <p style="color: #ef4444; font-weight: bold;">${error.message}</p>
+                        <p style="color: #6b7280; margin-top: 10px;">Please check your internet connection and server status.</p>
+                    </div>
+                    <p style="margin: 15px 0 0 0; font-size: 12px; color: #666; text-align: center; font-style: italic;">
+                        Error occurred at: ${new Date().toLocaleString()}
+                    </p>
+                </div>
+            `;
+        }
+    }

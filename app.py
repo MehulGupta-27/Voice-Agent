@@ -131,3 +131,85 @@ async def transcribe_file(file: UploadFile = File(...)):
             "error": f"Transcription error: {str(e)}",
             "status": "error"
         }
+        
+@app.post("/tts/echo")
+async def tts_echo(file: UploadFile = File(...)):
+    try:
+        print(f"Received file for echo: {file.filename}, Content-Type: {file.content_type}")
+        
+        audio_data = await file.read()
+        print(f"Audio data size: {len(audio_data)} bytes")
+        
+        print("Starting transcription with AssemblyAI...")
+        transcript = transcriber.transcribe(audio_data)
+        
+        if transcript.status == aai.TranscriptStatus.error:
+            print(f"Transcription failed: {transcript.error}")
+            return {
+                "error": f"Transcription failed: {transcript.error}",
+                "status": "error"
+            }
+        
+        transcribed_text = transcript.text
+        print(f"Transcription completed: {transcribed_text}")
+        
+        if not transcribed_text or transcribed_text.strip() == "":
+            return {
+                "error": "No speech detected in the audio",
+                "status": "error"
+            }
+        
+        print("Generating speech with Murf API...")
+        murf_url = "https://api.murf.ai/v1/speech/generate-with-key"
+        
+        murf_headers = {
+            "accept": "application/json",
+            "Content-Type": "application/json",
+            "api-key": os.getenv("MURF_API_KEY")
+        }
+        
+        murf_payload = {
+            "text": transcribed_text,
+            "voiceId": "en-US-marcus",
+            "format": "MP3"
+        }
+        
+        murf_response = requests.post(murf_url, headers=murf_headers, json=murf_payload)
+        
+        if murf_response.status_code != 200:
+            print(f"Murf API failed: {murf_response.status_code} - {murf_response.text}")
+            return {
+                "error": f"Speech generation failed: {murf_response.text}",
+                "status": "error"
+            }
+        
+        murf_result = murf_response.json()
+        audio_url = murf_result.get("audioFile")
+        
+        if not audio_url:
+            print("No audio URL in Murf response")
+            return {
+                "error": "No audio URL received from Murf API",
+                "status": "error"
+            }
+        
+        print(f"Echo bot completed successfully. Audio URL: {audio_url}")
+        
+        response_data = {
+            "status": "success",
+            "original_filename": file.filename,
+            "transcribed_text": transcribed_text,
+            "audio_url": audio_url,
+            "voice_id": "en-US-marcus",
+            "audio_duration": transcript.audio_duration,
+            "words_count": len(transcribed_text.split()) if transcribed_text else 0
+        }
+        
+        return response_data
+        
+    except Exception as e:
+        print(f"Error in echo bot: {str(e)}")
+        return {
+            "error": f"Echo bot error: {str(e)}",
+            "status": "error"
+        }
