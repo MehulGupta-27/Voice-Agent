@@ -6,6 +6,9 @@ import os
 import requests
 from pathlib import Path
 import assemblyai as aai
+import google.generativeai as genai
+from datetime import datetime
+
 
 load_dotenv()
 
@@ -21,6 +24,10 @@ except Exception as e:
 
 aai.settings.api_key = os.getenv("ASSEMBLYAI_API_KEY")
 transcriber = aai.Transcriber()
+
+# Configure Gemini AI
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+gemini_model = genai.GenerativeModel('gemini-1.5-flash')
  
 app.add_middleware(
     CORSMiddleware,
@@ -34,6 +41,9 @@ class TTSRequest(BaseModel):
     text: str
     voiceId: str
     format: str = "MP3"
+
+class LLMRequest(BaseModel):
+    text: str
 
 @app.get("/")
 def working():
@@ -213,3 +223,44 @@ async def tts_echo(file: UploadFile = File(...)):
             "error": f"Echo bot error: {str(e)}",
             "status": "error"
         }
+
+@app.post("/llm/query")
+async def llm_query(req: LLMRequest):
+    try:
+        print(f"Received LLM query: {req.text}")
+        
+        if not req.text or req.text.strip() == "":
+            return {
+                "error": "Text input is required",
+                "status": "error"
+            }
+        
+        print("Generating response with Gemini AI...")
+        response = gemini_model.generate_content(req.text)
+        
+        if not response.text:
+            return {
+                "error": "No response generated from Gemini AI",
+                "status": "error"
+            }
+        
+        print(f"Gemini response generated successfully")
+        print(f"Response preview: {response.text[:100]}...")
+        
+        response_data = {
+            "status": "success",
+            "query": req.text,
+            "response": response.text,
+            "model": "gemini-1.5-flash",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return response_data
+        
+    except Exception as e:
+        print(f"Error in LLM query: {str(e)}")
+        return {
+            "error": f"LLM query error: {str(e)}",
+            "status": "error"
+        }
+
