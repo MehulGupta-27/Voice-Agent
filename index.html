@@ -4,13 +4,13 @@
     <link rel="stylesheet" href="style.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>30 Days of Voice Agents - Voice LLM Assistant</title>
+    <title>30 Days of Voice Agents - Day 10 Conversational Agent</title>
 </head>
 <body>
     <div class="main">
         <div class="header-section">
             <h1>30 Days of Voice Agents</h1>
-            <h2>Day-9 Voice LLM Assistant - Speaking AI</h2>
+            <h2>Day 10 - Conversational Agent with Memory</h2>
         </div>
 
         <div class="content-layout">
@@ -54,6 +54,24 @@
                 <div id="llmRecordingResult"></div>
                 
                 <div id="llmResults"></div>
+            </div>
+
+            <div class="section-box conversation-section">
+                <div class="section-header">
+                    <h3>💬 Conversational Agent - Chat with Memory</h3>
+                    <p>Have a continuous conversation! The AI remembers your chat history.</p>
+                    <div id="sessionInfo" style="font-size: 12px; color: #6b7280; margin-top: 10px;"></div>
+                </div>
+                
+                <div class="conversation-controls">
+                    <button type="button" id="startConversation">🎤 Start Conversation</button>
+                    <button type="button" id="stopConversation" disabled>⏹️ Stop</button>
+                    <button type="button" id="newSession">🔄 New Session</button>
+                </div>
+                
+                <div id="conversationStatus">Ready to start conversation...</div>
+                
+                <div id="conversationHistory"></div>
             </div>
         </div>
     </div>

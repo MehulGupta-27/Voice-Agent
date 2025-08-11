@@ -793,3 +793,224 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
         }
     }
+    const startConversationBtn = document.getElementById("startConversation");
+    const stopConversationBtn = document.getElementById("stopConversation");
+    const newSessionBtn = document.getElementById("newSession");
+    const conversationStatus = document.getElementById("conversationStatus");
+    const conversationHistory = document.getElementById("conversationHistory");
+    const sessionInfo = document.getElementById("sessionInfo");
+
+    let conversationRecorder;
+    let conversationChunks = [];
+    let currentSessionId = null;
+    let isAutoRecording = false;
+    let conversationMessages = [];
+
+    function initializeSession() {
+        const urlParams = new URLSearchParams(window.location.search);
+        currentSessionId = urlParams.get('session') || generateSessionId();
+        
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.set('session', currentSessionId);
+        window.history.replaceState({}, '', newUrl);
+        
+        updateSessionInfo();
+        loadChatHistory();
+    }
+
+    function generateSessionId() {
+        return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    function updateSessionInfo() {
+        sessionInfo.innerHTML = `Session ID: ${currentSessionId} | Messages: ${conversationMessages.length}`;
+    }
+
+    async function loadChatHistory() {
+        try {
+            const response = await fetch(`http://localhost:8000/agent/chat/${currentSessionId}/history`);
+            const result = await response.json();
+            
+            if (result.status === 'active') {
+                conversationMessages = result.messages;
+                displayConversationHistory();
+                updateSessionInfo();
+            }
+        } catch (error) {
+            console.error('Error loading chat history:', error);
+        }
+    }
+
+    function displayConversationHistory() {
+        if (conversationMessages.length === 0) {
+            conversationHistory.innerHTML = '<p style="color: #6b7280; font-style: italic; text-align: center;">No conversation yet. Start speaking to begin!</p>';
+            return;
+        }
+
+        const historyHTML = conversationMessages.map((message, index) => {
+            const isUser = message.role === 'user';
+            const bgColor = isUser ? '#f3f4f6' : '#f0f9ff';
+            const borderColor = isUser ? '#3b82f6' : '#10b981';
+            const icon = isUser ? '👤' : '🤖';
+            const label = isUser ? 'You' : 'AI Assistant';
+
+            return `
+                <div style="
+                    background: ${bgColor};
+                    padding: 15px;
+                    border-radius: 12px;
+                    border-left: 4px solid ${borderColor};
+                    margin: 10px 0;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-weight: bold; color: #374151; font-size: 14px;">${icon} ${label}</span>
+                        <span style="font-size: 12px; color: #6b7280;">${new Date(message.timestamp).toLocaleString()}</span>
+                    </div>
+                    <p style="margin: 0; color: #1f2937; line-height: 1.5;">${message.content}</p>
+                </div>
+            `;
+        }).join('');
+
+        conversationHistory.innerHTML = historyHTML;
+        
+        conversationHistory.scrollTop = conversationHistory.scrollHeight;
+    }
+
+    startConversationBtn.addEventListener("click", async (event) => {
+        event.preventDefault();
+        await startRecording();
+    });
+
+    stopConversationBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        stopRecording();
+    });
+
+    newSessionBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        startNewSession();
+    });
+
+    function startNewSession() {
+        currentSessionId = generateSessionId();
+        conversationMessages = [];
+        
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.set('session', currentSessionId);
+        window.history.replaceState({}, '', newUrl);
+        
+        updateSessionInfo();
+        displayConversationHistory();
+        conversationStatus.innerHTML = 'New session started. Ready to chat!';
+    }
+
+    async function startRecording() {
+        try {
+            console.log("Starting conversation recording");
+            conversationStatus.innerHTML = '<div class="status-message status-recording">🎤 Listening... Speak now!</div>';
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            console.log("Got media stream for conversation");
+
+            conversationRecorder = new MediaRecorder(stream);
+            conversationChunks = [];
+
+            conversationRecorder.ondataavailable = event => {
+                console.log("Conversation data available:", event.data.size);
+                if (event.data.size > 0) {
+                    conversationChunks.push(event.data);
+                }
+            };
+
+            conversationRecorder.onstop = async () => {
+                console.log("Conversation recording stopped");
+                const audioBlob = new Blob(conversationChunks, { type: 'audio/webm' });
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `conversation_${currentSessionId}_${timestamp}.webm`;
+
+                console.log('Conversation audio blob created:', audioBlob.size, 'bytes');
+
+                conversationStatus.innerHTML = '<div class="status-message status-processing">🤖 AI is thinking...</div>';
+
+                await processConversation(audioBlob, filename);
+            };
+
+            conversationRecorder.start();
+            console.log("Conversation recording started");
+            startConversationBtn.disabled = true;
+            stopConversationBtn.disabled = false;
+        } catch (err) {
+            console.error("Conversation recording error:", err);
+            conversationStatus.innerHTML = `<div class="status-message status-error">❌ Microphone access denied: ${err.message}</div>`;
+        }
+    }
+
+    function stopRecording() {
+        console.log("Stop conversation clicked");
+        if (conversationRecorder && conversationRecorder.state !== "inactive") {
+            conversationRecorder.stop();
+            startConversationBtn.disabled = false;
+            stopConversationBtn.disabled = true;
+            console.log("Conversation recording stopped by user");
+        }
+    }
+
+    async function processConversation(audioBlob, filename) {
+        try {
+            console.log('Starting conversation processing...');
+
+            const formData = new FormData();
+            formData.append('file', audioBlob, filename);
+
+            console.log('Sending audio for conversation:', filename, 'Size:', audioBlob.size);
+
+            const response = await fetch(`http://localhost:8000/agent/chat/${currentSessionId}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            console.log('Conversation response:', result);
+
+            if (response.ok && result.status === 'success') {
+                conversationMessages.push({
+                    role: 'user',
+                    content: result.user_message,
+                    timestamp: result.timestamp
+                });
+                
+                conversationMessages.push({
+                    role: 'assistant',
+                    content: result.ai_response,
+                    timestamp: result.timestamp
+                });
+
+                displayConversationHistory();
+                updateSessionInfo();
+
+                conversationStatus.innerHTML = '<div class="status-message status-success">✅ Response ready! Listening for next message...</div>';
+
+                const audio = new Audio(result.audioFile);
+                
+                audio.addEventListener('ended', () => {
+                    console.log('AI response finished playing, auto-starting recording...');
+                    setTimeout(() => {
+                        if (!conversationRecorder || conversationRecorder.state === "inactive") {
+                            startRecording();
+                        }
+                    }, 1000);
+                });
+                
+                audio.play().catch(e => console.log('Auto-play blocked:', e));
+
+            } else {
+                conversationStatus.innerHTML = `<div class="status-message status-error">❌ Conversation failed: ${result.error || 'Unknown error'}</div>`;
+            }
+        } catch (error) {
+            console.error('Conversation error:', error);
+            conversationStatus.innerHTML = `<div class="status-message status-error">❌ Network error: ${error.message}</div>`;
+        }
+    }
+
+    initializeSession();
