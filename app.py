@@ -225,42 +225,98 @@ async def tts_echo(file: UploadFile = File(...)):
         }
 
 @app.post("/llm/query")
-async def llm_query(req: LLMRequest):
+async def llm_query(file: UploadFile = File(...)):
     try:
-        print(f"Received LLM query: {req.text}")
+        print(f"Received audio for LLM query: {file.filename}, Content-Type: {file.content_type}")
         
-        if not req.text or req.text.strip() == "":
+        audio_data = await file.read()
+        print(f"Audio data size: {len(audio_data)} bytes")
+        
+        print("Step 1: Transcribing audio with AssemblyAI...")
+        transcript = transcriber.transcribe(audio_data)
+        
+        if transcript.status == aai.TranscriptStatus.error:
+            print(f"Transcription failed: {transcript.error}")
             return {
-                "error": "Text input is required",
+                "error": f"Transcription failed: {transcript.error}",
                 "status": "error"
             }
         
-        print("Generating response with Gemini AI...")
-        response = gemini_model.generate_content(req.text)
+        user_query = transcript.text
+        print(f"User query: {user_query}")
         
-        if not response.text:
+        if not user_query or user_query.strip() == "":
+            return {
+                "error": "No speech detected in the audio",
+                "status": "error"
+            }
+        
+        print("Step 2: Generating LLM response with Gemini AI...")
+        llm_response = gemini_model.generate_content(user_query)
+        
+        if not llm_response.text:
             return {
                 "error": "No response generated from Gemini AI",
                 "status": "error"
             }
         
-        print(f"Gemini response generated successfully")
-        print(f"Response preview: {response.text[:100]}...")
+        ai_response_text = llm_response.text.strip()
+        print(f"LLM response: {ai_response_text[:100]}...")
+        
+        print("Step 3: Converting LLM response to speech with Murf...")
+        murf_url = "https://api.murf.ai/v1/speech/generate-with-key"
+        
+        murf_headers = {
+            "accept": "application/json",
+            "Content-Type": "application/json",
+            "api-key": os.getenv("MURF_API_KEY")
+        }
+        
+        murf_payload = {
+            "text": ai_response_text,
+            "voiceId": "en-US-marcus",
+            "format": "MP3"
+        }
+        
+        murf_response = requests.post(murf_url, headers=murf_headers, json=murf_payload)
+        
+        if murf_response.status_code != 200:
+            print(f"Murf API failed: {murf_response.status_code} - {murf_response.text}")
+            return {
+                "error": f"Speech generation failed: {murf_response.text}",
+                "status": "error"
+            }
+        
+        murf_result = murf_response.json()
+        audio_url = murf_result.get("audioFile")
+        
+        if not audio_url:
+            print("No audio URL in Murf response")
+            return {
+                "error": "No audio URL received from Murf API",
+                "status": "error"
+            }
+        
+        print(f"Voice LLM query completed successfully. Audio URL: {audio_url}")
         
         response_data = {
             "status": "success",
-            "query": req.text,
-            "response": response.text,
+            "original_filename": file.filename,
+            "user_query": user_query,
+            "llm_response": ai_response_text,
+            "audioFile": audio_url,
+            "voice_id": "en-US-marcus",
             "model": "gemini-1.5-flash",
+            "audio_duration": transcript.audio_duration,
             "timestamp": datetime.now().isoformat()
         }
         
         return response_data
         
     except Exception as e:
-        print(f"Error in LLM query: {str(e)}")
+        print(f"Error in voice LLM query: {str(e)}")
         return {
-            "error": f"LLM query error: {str(e)}",
+            "error": f"Voice LLM query error: {str(e)}",
             "status": "error"
         }
 

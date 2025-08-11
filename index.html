@@ -4,13 +4,13 @@
     <link rel="stylesheet" href="style.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>30 Days of Voice Agents - Day 7</title>
+    <title>30 Days of Voice Agents - Voice LLM Assistant</title>
 </head>
 <body>
     <div class="main">
         <div class="header-section">
             <h1>30 Days of Voice Agents</h1>
-            <h2>Day-8 Integrating a Large Language Model (LLM)</h2>
+            <h2>Day-9 Voice LLM Assistant - Speaking AI</h2>
         </div>
 
         <div class="content-layout">
@@ -38,6 +38,22 @@
                 <div id="recordingResult"></div>
                 
                 <div id="uploadResults"></div>
+            </div>
+
+            <div class="section-box llm-section">
+                <div class="section-header">
+                    <h3>🧠 Voice LLM Assistant - Speak & Get AI Responses</h3>
+                    <p>Ask questions with your voice and get spoken AI responses!</p>
+                </div>
+                
+                <div class="recording-controls">
+                    <button type="button" id="startLLMRecording">🎤 Ask AI</button>
+                    <button type="button" id="stopLLMRecording" disabled>⏹️ Stop Question</button>
+                </div>
+                
+                <div id="llmRecordingResult"></div>
+                
+                <div id="llmResults"></div>
             </div>
         </div>
     </div>

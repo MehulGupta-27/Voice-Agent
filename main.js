@@ -552,3 +552,244 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
         }
     }
+ 
+    const startLLMBtn = document.getElementById("startLLMRecording");
+    const stopLLMBtn = document.getElementById("stopLLMRecording");
+    const llmRecordingResult = document.getElementById("llmRecordingResult");
+    const llmResults = document.getElementById("llmResults");
+
+    let llmMediaRecorder;
+    let llmAudioChunks = [];
+
+    startLLMBtn.addEventListener("click", async (event) => {
+        event.preventDefault();
+        try {
+            console.log("Start LLM recording clicked");
+            llmRecordingResult.innerHTML = '<div class="status-message status-recording">🎤 Ask your question...</div>';
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            console.log("Got media stream for LLM");
+
+            llmMediaRecorder = new MediaRecorder(stream);
+            llmAudioChunks = [];
+
+            llmMediaRecorder.ondataavailable = event => {
+                console.log("LLM data available:", event.data.size);
+                if (event.data.size > 0) {
+                    llmAudioChunks.push(event.data);
+                }
+            };
+
+            llmMediaRecorder.onstop = () => {
+                console.log("LLM recording stopped");
+                const audioBlob = new Blob(llmAudioChunks, { type: 'audio/webm' });
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `llm_query_${timestamp}.webm`;
+
+                console.log('LLM audio blob created:', audioBlob.size, 'bytes');
+
+                llmRecordingResult.innerHTML = `
+                    <div style="
+                        background: #f0f9ff;
+                        border: 3px solid #0ea5e9;
+                        border-radius: 12px;
+                        padding: 20px;
+                        margin: 20px 0;
+                        width: 100%;
+                        max-width: 100%;
+                        box-sizing: border-box;
+                        position: relative;
+                        display: block !important;
+                        visibility: visible !important;
+                        opacity: 1 !important;
+                    ">
+                        <h3 style="color: #0ea5e9; margin: 0 0 15px 0; font-size: 20px;">🎤 Question Recorded!</h3>
+                        
+                        <div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #ddd;">
+                            <p style="margin: 0 0 10px 0; font-weight: bold; color: #374151;">📁 Audio Details:</p>
+                            <p style="margin: 5px 0;"><strong>Filename:</strong> ${filename}</p>
+                            <p style="margin: 5px 0;"><strong>Size:</strong> ${audioBlob.size} bytes (${(audioBlob.size / 1024).toFixed(2)} KB)</p>
+                            <p style="margin: 5px 0;"><strong>Status:</strong> Processing with AI...</p>
+                        </div>
+                        
+                        <p style="margin: 15px 0 0 0; font-size: 12px; color: #666; text-align: center; font-style: italic;">
+                            Recorded at: ${new Date().toLocaleString()}
+                        </p>
+                    </div>
+                `;
+
+                setTimeout(async () => {
+                    console.log('🧠 Starting LLM processing...');
+                    await processVoiceLLM(audioBlob, filename);
+                }, 1000);
+            };
+
+            llmMediaRecorder.start();
+            console.log("LLM recording started");
+            startLLMBtn.disabled = true;
+            stopLLMBtn.disabled = false;
+        } catch (err) {
+            console.error("LLM recording error:", err);
+            llmRecordingResult.innerHTML = `<p style="color:red;">Microphone access denied or not supported: ${err.message}</p>`;
+        }
+    });
+
+    stopLLMBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        console.log("Stop LLM recording clicked");
+        if (llmMediaRecorder && llmMediaRecorder.state !== "inactive") {
+            llmMediaRecorder.stop();
+            startLLMBtn.disabled = false;
+            stopLLMBtn.disabled = true;
+            console.log("LLM recording stopped by user");
+        }
+    });
+
+    async function processVoiceLLM(audioBlob, filename) {
+        try {
+            console.log('Starting voice LLM process...');
+
+            if (!llmResults) {
+                console.error('LLM results container not found');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', audioBlob, filename);
+
+            console.log('Sending audio for LLM processing:', filename, 'Size:', audioBlob.size);
+
+            llmResults.innerHTML = `
+                <div style="
+                    border: 2px solid #0ea5e9; 
+                    padding: 15px; 
+                    margin: 15px 0; 
+                    background: #f0f9ff; 
+                    border-radius: 10px;
+                    animation: pulse 2s infinite;
+                ">
+                    <h3 style="color: #0369a1; margin: 0 0 10px 0; font-size: 18px;">🧠 AI is thinking...</h3>
+                    <p style="margin: 0; color: #0369a1;">Transcribing → Generating AI response → Converting to speech...</p>
+                </div>
+            `;
+
+            const response = await fetch('http://localhost:8000/llm/query', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            console.log('Voice LLM response:', result);
+
+            if (response.ok && result.status === 'success') {
+                llmResults.innerHTML = `
+                    <div style="
+                        border: 3px solid #0ea5e9; 
+                        padding: 20px; 
+                        margin: 15px 0; 
+                        background: #f0f9ff; 
+                        border-radius: 10px;
+                        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                    ">
+                        <h3 style="color: #0369a1; margin: 0 0 15px 0; font-size: 18px;">🧠 AI Response Complete!</h3>
+                        
+                        <div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #ddd;">
+                            <p style="margin: 0 0 10px 0; font-weight: bold; color: #374151;">❓ Your Question:</p>
+                            <div style="
+                                background: #f9fafb; 
+                                padding: 15px; 
+                                border-radius: 6px; 
+                                border-left: 4px solid #0ea5e9;
+                                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                                line-height: 1.6;
+                                color: #1f2937;
+                                font-size: 16px;
+                            ">
+                                "${result.user_query || 'No speech detected.'}"
+                            </div>
+                        </div>
+
+                        <div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #ddd;">
+                            <p style="margin: 0 0 10px 0; font-weight: bold; color: #374151;">🤖 AI Response:</p>
+                            <div style="
+                                background: #f0f9ff; 
+                                padding: 15px; 
+                                border-radius: 6px; 
+                                border-left: 4px solid #10b981;
+                                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                                line-height: 1.6;
+                                color: #1f2937;
+                                font-size: 16px;
+                                margin-bottom: 15px;
+                            ">
+                                "${result.llm_response || 'No response generated.'}"
+                            </div>
+                            <audio controls src="${result.audioFile}" style="width: 100%; margin: 10px 0;"></audio>
+                        </div>
+
+                        <div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #ddd;">
+                            <p style="margin: 0 0 10px 0; font-weight: bold; color: #374151;">📊 Processing Details:</p>
+                            <p style="margin: 5px 0; font-size: 14px;"><strong>📁 Original File:</strong> ${result.original_filename}</p>
+                            <p style="margin: 5px 0; font-size: 14px;"><strong>🎤 Voice:</strong> ${result.voice_id}</p>
+                            <p style="margin: 5px 0; font-size: 14px;"><strong>🤖 Model:</strong> ${result.model}</p>
+                            <p style="margin: 5px 0; font-size: 14px;"><strong>⏱️ Duration:</strong> ${result.audio_duration ? result.audio_duration.toFixed(2) + 's' : 'N/A'}</p>
+                            <p style="margin: 5px 0; font-size: 14px;"><strong>🔧 Services:</strong> AssemblyAI + Gemini + Murf</p>
+                        </div>
+                        
+                        <p style="margin: 15px 0 0 0; font-size: 12px; color: #666; text-align: center; font-style: italic;">
+                            AI response completed at: ${new Date().toLocaleString()}
+                        </p>
+                    </div>
+                `;
+
+                console.log('Voice LLM successful - results displayed');
+
+                setTimeout(() => {
+                    const audioElement = document.querySelector('#llmResults audio');
+                    if (audioElement) {
+                        audioElement.play().catch(e => console.log('Auto-play blocked:', e));
+                    }
+                }, 500);
+
+            } else {
+                llmResults.innerHTML = `
+                    <div style="
+                        border: 3px solid #ef4444; 
+                        padding: 15px; 
+                        margin: 10px 0; 
+                        background: #fef2f2; 
+                        border-radius: 8px;
+                    ">
+                        <h3 style="color: #ef4444; margin: 0 0 15px 0; font-size: 18px;">❌ AI Processing Failed</h3>
+                        <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
+                            <p style="color: #ef4444; font-weight: bold;">${result.error || 'Unknown AI processing error'}</p>
+                            <p style="color: #6b7280; margin-top: 10px;">Please check your API keys and try again.</p>
+                        </div>
+                        <p style="margin: 15px 0 0 0; font-size: 12px; color: #666; text-align: center; font-style: italic;">
+                            Failed at: ${new Date().toLocaleString()}
+                        </p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Voice LLM error:', error);
+            llmResults.innerHTML = `
+                <div style="
+                    border: 3px solid #ef4444; 
+                    padding: 15px; 
+                    margin: 10px 0; 
+                    background: #fef2f2; 
+                    border-radius: 8px;
+                ">
+                    <h3 style="color: #ef4444; margin: 0 0 15px 0; font-size: 18px;">❌ Network Error</h3>
+                    <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd;">
+                        <p style="color: #ef4444; font-weight: bold;">${error.message}</p>
+                        <p style="color: #6b7280; margin-top: 10px;">Please check your internet connection and server status.</p>
+                    </div>
+                    <p style="margin: 15px 0 0 0; font-size: 12px; color: #666; text-align: center; font-style: italic;">
+                        Error occurred at: ${new Date().toLocaleString()}
+                    </p>
+                </div>
+            `;
+        }
+    }
