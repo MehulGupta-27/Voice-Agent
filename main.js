@@ -1,12 +1,10 @@
-document.addEventListener("DOMContentLoaded", () => {
-    initMatrixBackground();
-    
+ document.addEventListener("DOMContentLoaded", () => {
     const recordButton = document.getElementById("recordButton");
     const conversationStatus = document.getElementById("conversationStatus");
     const conversationHistory = document.getElementById("conversationHistory");
     const newSessionBtn = document.getElementById("newSession");
     const clearHistoryBtn = document.getElementById("clearHistory");
-    const continuousModeBtn = document.getElementById("continuousMode");
+
     const sessionInfo = document.getElementById("sessionInfo");
     const connectionStatus = document.getElementById("connectionStatus");
     const emptyState = document.getElementById("emptyState");
@@ -16,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let audioChunks = [];
     let sessionId = generateSessionId();
     let conversationCount = 0;
-    let continuousMode = true; // Start with continuous mode enabled
+    const continuousMode = true;
 
     updateSessionInfo();
     checkConnection();
@@ -24,14 +22,14 @@ document.addEventListener("DOMContentLoaded", () => {
     recordButton.addEventListener("click", toggleRecording);
     newSessionBtn.addEventListener("click", startNewSession);
     clearHistoryBtn.addEventListener("click", clearHistory);
-    continuousModeBtn.addEventListener("click", toggleContinuousMode);
+
 
     function generateSessionId() {
         return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
 
     function updateSessionInfo() {
-        sessionInfo.textContent = `NEURAL-${sessionId.split('_')[1].slice(-4).toUpperCase()} • MSG: ${conversationCount.toString().padStart(3, '0')}`;
+        sessionInfo.textContent = `Session ${sessionId.split('_')[1].slice(-4)} • ${conversationCount} messages`;
     }
 
     function startNewSession() {
@@ -45,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setTimeout(() => {
             hideEmptyState();
             addMessage("ai", "Hello! I'm your AI assistant. How can I help you today?", null, true);
-        }, 1000);
+        }, 800);
     }
 
     function clearHistory() {
@@ -53,26 +51,14 @@ document.addEventListener("DOMContentLoaded", () => {
         showEmptyState();
         conversationCount = 0;
         updateSessionInfo();
-        updateStatus("MEMORY BANKS CLEARED • SYSTEM RESET COMPLETE", "status-ready");
+        updateStatus("Conversation cleared", "status-ready");
     }
 
-    function toggleContinuousMode() {
-        continuousMode = !continuousMode;
-        
-        if (continuousMode) {
-            continuousModeBtn.classList.add('active');
-            continuousModeBtn.querySelector('.btn-text').textContent = 'CONTINUOUS';
-            updateStatus("CONTINUOUS MODE ACTIVATED • AUTO-LISTENING ENABLED", "status-ready");
-        } else {
-            continuousModeBtn.classList.remove('active');
-            continuousModeBtn.querySelector('.btn-text').textContent = 'MANUAL';
-            updateStatus("MANUAL MODE ACTIVATED • CLICK TO TALK", "status-ready");
-        }
-    }
+
 
     function showEmptyState() {
         if (emptyState) {
-            emptyState.style.display = 'block';
+            emptyState.style.display = 'flex';
         }
     }
 
@@ -96,19 +82,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function updateConnectionStatus(isConnected) {
-        const connectionText = connectionStatus.querySelector('.connection-text');
-        const signalBars = connectionStatus.querySelectorAll('.bar');
+        const connectionText = connectionStatus.querySelector('span');
+        const connectionDot = connectionStatus.querySelector('.connection-dot');
         
         if (isConnected) {
-            connectionText.textContent = 'ONLINE';
-            signalBars.forEach(bar => {
-                bar.style.background = '#00ff88';
-            });
+            connectionText.textContent = 'Online';
+            connectionDot.style.background = '#27ae60';
         } else {
-            connectionText.textContent = 'OFFLINE';
-            signalBars.forEach(bar => {
-                bar.style.background = '#ff0044';
-            });
+            connectionText.textContent = 'Offline';
+            connectionDot.style.background = '#e74c3c';
         }
     }
 
@@ -146,11 +128,11 @@ document.addEventListener("DOMContentLoaded", () => {
             isRecording = true;
             
             recordButton.classList.add("recording");
-            updateStatus("NEURAL LINK ACTIVE • VOICE INPUT DETECTED", "status-recording");
+            updateStatus("Listening... tap to stop", "status-recording");
             
         } catch (error) {
             console.error("Error starting recording:", error);
-            updateStatus("Microphone access denied. Please allow microphone access and try again.", "status-error");
+            updateStatus("Microphone access denied", "status-error");
         }
     }
 
@@ -160,7 +142,7 @@ document.addEventListener("DOMContentLoaded", () => {
             isRecording = false;
             
             recordButton.classList.remove("recording");
-            updateStatus("NEURAL PROCESSING • ANALYZING VOICE DATA", "status-processing");
+            updateStatus("Processing your message...", "status-processing");
         }
     }
 
@@ -172,7 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
             formData.append('file', audioBlob, filename);
             formData.append('session_id', sessionId);
 
-            updateStatus("🧠 Getting AI response...", "status-processing");
+            updateStatus("Getting AI response...", "status-processing");
 
             const response = await fetch('http://localhost:8000/conversation/query', {
                 method: 'POST',
@@ -183,51 +165,42 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (response.ok && result.status === 'success') {
                 addMessage("user", result.user_query);
-                
                 addMessage("ai", result.ai_response, result.audioFile);
                 
                 conversationCount++;
                 updateSessionInfo();
-                updateStatus("VOICE RECOGNITION READY • NEURAL LINK STABLE", "status-ready");
+                updateStatus("Ready for your next message", "status-ready");
                 
                 if (result.audioFile && !result.audioFile.startsWith('web-speech:')) {
                     setTimeout(() => {
                         const audioElements = conversationHistory.querySelectorAll('audio');
                         const lastAudio = audioElements[audioElements.length - 1];
                         if (lastAudio) {
-                            // Play the audio
-                            lastAudio.play().catch(e => console.log("Auto-play prevented by browser"));
+                            lastAudio.play().catch(e => console.log("Auto-play prevented"));
                             
-                            // Start listening again after audio finishes (if continuous mode is on)
                             lastAudio.addEventListener('ended', () => {
-                                setTimeout(() => {
-                                    if (!isRecording && continuousMode) {
-                                        updateStatus("🎤 READY FOR NEXT INPUT • AUTO-LISTENING ENABLED", "status-ready");
-                                        // Auto-start recording after a brief pause
+                                if (continuousMode && !isRecording) {
+                                    setTimeout(() => {
+                                        updateStatus("Ready for next input", "status-ready");
                                         setTimeout(() => {
-                                            if (!isRecording && continuousMode) {
+                                            if (continuousMode && !isRecording) {
                                                 startRecording();
                                             }
                                         }, 1500);
-                                    } else if (!continuousMode) {
-                                        updateStatus("🎤 MANUAL MODE • CLICK TO TALK", "status-ready");
-                                    }
-                                }, 500);
+                                    }, 500);
+                                }
                             });
                         }
                     }, 500);
-                } else {
-                    // If no audio, start listening again after a brief delay (if continuous mode is on)
+                } else if (continuousMode) {
                     setTimeout(() => {
-                        if (!isRecording && continuousMode) {
-                            updateStatus("🎤 READY FOR NEXT INPUT • AUTO-LISTENING ENABLED", "status-ready");
+                        if (!isRecording) {
+                            updateStatus("Ready for next input", "status-ready");
                             setTimeout(() => {
-                                if (!isRecording && continuousMode) {
+                                if (continuousMode && !isRecording) {
                                     startRecording();
                                 }
                             }, 2000);
-                        } else if (!continuousMode) {
-                            updateStatus("🎤 MANUAL MODE • CLICK TO TALK", "status-ready");
                         }
                     }, 1000);
                 }
@@ -235,14 +208,13 @@ document.addEventListener("DOMContentLoaded", () => {
             } else {
                 const errorMessage = result.error || "Sorry, I couldn't process your message.";
                 addMessage("ai", errorMessage, result.audioFile);
-                updateStatus("NEURAL LINK ERROR • SYSTEM RECOVERY INITIATED", "status-error");
+                updateStatus("Error occurred. Try again.", "status-error");
             }
 
         } catch (error) {
             console.error("Error processing conversation:", error);
-            addMessage("ai", "I'm having trouble connecting right now. Please try again in a moment.");
-            updateStatus("CRITICAL ERROR • NEURAL NETWORK DISCONNECTED", "status-error");
-        } finally {
+            addMessage("ai", "I'm having trouble connecting right now. Please try again.");
+            updateStatus("Connection error. Try again.", "status-error");
         }
     }
 
@@ -276,7 +248,7 @@ document.addEventListener("DOMContentLoaded", () => {
             
             const playBtn = document.createElement("button");
             playBtn.className = "audio-play-btn";
-            playBtn.innerHTML = '<div class="play-icon">▶</div>';
+            playBtn.innerHTML = '▶';
             
             const progressContainer = document.createElement("div");
             progressContainer.className = "audio-progress-container";
@@ -289,18 +261,9 @@ document.addEventListener("DOMContentLoaded", () => {
             timeDisplay.className = "audio-time";
             timeDisplay.textContent = "0:00";
             
-            const waveform = document.createElement("div");
-            waveform.className = "audio-waveform";
-            for (let i = 0; i < 7; i++) {
-                const bar = document.createElement("div");
-                bar.className = "wave-bar";
-                waveform.appendChild(bar);
-            }
-            
             customPlayer.appendChild(playBtn);
             customPlayer.appendChild(progressContainer);
             customPlayer.appendChild(timeDisplay);
-            customPlayer.appendChild(waveform);
             
             let isPlaying = false;
             
@@ -314,16 +277,14 @@ document.addEventListener("DOMContentLoaded", () => {
             
             audio.addEventListener('play', () => {
                 isPlaying = true;
-                playBtn.innerHTML = '<div class="pause-icon">⏸</div>';
+                playBtn.innerHTML = '⏸';
                 playBtn.classList.add('playing');
-                customPlayer.classList.add('playing');
             });
             
             audio.addEventListener('pause', () => {
                 isPlaying = false;
-                playBtn.innerHTML = '<div class="play-icon">▶</div>';
+                playBtn.innerHTML = '▶';
                 playBtn.classList.remove('playing');
-                customPlayer.classList.remove('playing');
             });
             
             audio.addEventListener('timeupdate', () => {
@@ -339,26 +300,21 @@ document.addEventListener("DOMContentLoaded", () => {
             
             audio.addEventListener('ended', () => {
                 isPlaying = false;
-                playBtn.innerHTML = '<div class="play-icon">▶</div>';
+                playBtn.innerHTML = '▶';
                 playBtn.classList.remove('playing');
-                customPlayer.classList.remove('playing');
                 progressBar.style.width = '0%';
                 timeDisplay.textContent = "0:00";
                 
-                // Trigger auto-listening after audio ends (if continuous mode is on)
-                setTimeout(() => {
-                    if (!isRecording && continuousMode) {
-                        updateStatus("🎤 READY FOR NEXT INPUT • AUTO-LISTENING ENABLED", "status-ready");
-                        // Auto-start recording after a brief pause
+                if (continuousMode && !isRecording) {
+                    setTimeout(() => {
+                        updateStatus("Ready for next input", "status-ready");
                         setTimeout(() => {
-                            if (!isRecording && continuousMode) {
+                            if (continuousMode && !isRecording) {
                                 startRecording();
                             }
                         }, 1500);
-                    } else if (!continuousMode) {
-                        updateStatus("🎤 MANUAL MODE • CLICK TO TALK", "status-ready");
-                    }
-                }, 500);
+                    }, 500);
+                }
             });
             
             progressContainer.addEventListener('click', (e) => {
@@ -388,58 +344,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function updateStatus(message, className = "") {
         conversationStatus.textContent = message;
-        conversationStatus.className = `activation-status ${className}`;
+        conversationStatus.className = `status-text ${className}`;
     }
 
     setTimeout(() => {
-        hideEmptyState();
-        addMessage("ai", "Hello! I'm your AI assistant. How can I help you today?", null, true);
-        updateStatus("VOICE RECOGNITION READY • NEURAL PROCESSING ONLINE", "status-ready");
-    }, 2000);
+        if (conversationHistory.children.length <= 1) {
+            hideEmptyState();
+            addMessage("ai", "Hello! I'm your AI assistant. How can I help you today?", null, true);
+            updateStatus("Ready to chat - press the microphone to start!", "status-ready");
+        }
+    }, 1000);
 
     setInterval(checkConnection, 30000);
 });
-
-function initMatrixBackground() {
-    const canvas = document.getElementById('matrixCanvas');
-    const ctx = canvas.getContext('2d');
-    
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    
-    const matrix = "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789@#$%^&*()*&^%+-/~{[|`]}";
-    const matrixArray = matrix.split("");
-    
-    const fontSize = 10;
-    const columns = canvas.width / fontSize;
-    
-    const drops = [];
-    for(let x = 0; x < columns; x++) {
-        drops[x] = 1;
-    }
-    
-    function draw() {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.fillStyle = '#00ff88';
-        ctx.font = fontSize + 'px monospace';
-        
-        for(let i = 0; i < drops.length; i++) {
-            const text = matrixArray[Math.floor(Math.random() * matrixArray.length)];
-            ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-            
-            if(drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
-                drops[i] = 0;
-            }
-            drops[i]++;
-        }
-    }
-    
-    setInterval(draw, 35);
-    
-    window.addEventListener('resize', () => {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-    });
-}

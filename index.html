@@ -2,156 +2,64 @@
 <html lang="en">
 <head>
     <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI - Voice Interface</title>
+    <title>Voice Assistant</title>
 </head>
 <body>
-    <div class="matrix-bg">
-        <canvas id="matrixCanvas"></canvas>
-    </div>
-    
-    <div class="hud-overlay">
-        <div class="hud-top">
-            <div class="hud-section">
-                <div class="system-logo">
-                    <div class="logo-core"></div>
-                    <div class="logo-rings">
-                        <div class="ring ring-1"></div>
-                        <div class="ring ring-2"></div>
-                        <div class="ring ring-3"></div>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <h1>Voice Assistant</h1>
+                <p>Speak naturally, get intelligent responses</p>
+            </div>
+            <div class="header-actions">
+                <button id="newSession" class="btn btn-primary">
+                    New Chat
+                </button>
+                <button id="clearHistory" class="btn btn-secondary">
+                    Clear
+                </button>
+            </div>
+        </header>
+
+        <main class="main">
+            <div class="chat-area">
+                <div id="conversationHistory" class="messages">
+                    <div class="empty-state" id="emptyState">
+                        <h3>Ready to chat!</h3>
+                        <p>Press the microphone button below to start a conversation</p>
                     </div>
                 </div>
-                <div class="system-info">
-                    <h1 class="system-title">NEXUS AI</h1>
-                    <div class="system-subtitle">NEURAL VOICE INTERFACE</div>
-                </div>
             </div>
-            
-            <div class="hud-controls">
-                <button id="continuousMode" class="hud-btn continuous active">
-                    <div class="btn-glow"></div>
-                    <span class="btn-text">CONTINUOUS</span>
-                </button>
-                <button id="newSession" class="hud-btn primary">
-                    <div class="btn-glow"></div>
-                    <span class="btn-text">NEW SESSION</span>
-                </button>
-                <button id="clearHistory" class="hud-btn secondary">
-                    <div class="btn-glow"></div>
-                    <span class="btn-icon">⚡</span>
-                </button>
-            </div>
-        </div>
 
-        <div class="main-interface">
-            <div class="chat-display">
-                <div class="display-frame">
-                    <div class="frame-corners">
-                        <div class="corner corner-tl"></div>
-                        <div class="corner corner-tr"></div>
-                        <div class="corner corner-bl"></div>
-                        <div class="corner corner-br"></div>
+            <div class="input-area">
+                <div class="input-container">
+                    <div class="session-status">
+                        <span id="sessionInfo" class="session-text">Ready to chat</span>
+                        <div class="connection-badge" id="connectionStatus">
+                            <div class="connection-dot"></div>
+                            <span>Online</span>
+                        </div>
                     </div>
                     
-                    <div id="conversationHistory" class="chat-content">
-                        <div class="ai-standby" id="emptyState">
-                            <div class="standby-visual">
-                                <div class="neural-network">
-                                    <div class="node node-center"></div>
-                                    <div class="node node-1"></div>
-                                    <div class="node node-2"></div>
-                                    <div class="node node-3"></div>
-                                    <div class="node node-4"></div>
-                                    <div class="connection con-1"></div>
-                                    <div class="connection con-2"></div>
-                                    <div class="connection con-3"></div>
-                                    <div class="connection con-4"></div>
-                                </div>
-                            </div>
-                            <div class="standby-text">
-                                <h2>AI SYSTEM READY</h2>
-                                <p>VOICE RECOGNITION ACTIVE • NEURAL PROCESSING ONLINE</p>
-                            </div>
-                        </div>
+                    <div class="voice-input">
+                        <button id="recordButton" class="record-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4z"/>
+                                <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                                <line x1="12" y1="19" x2="12" y2="23"/>
+                                <line x1="8" y1="23" x2="16" y2="23"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="status-display">
+                        <span id="conversationStatus" class="status-text">Ready to start conversation</span>
                     </div>
                 </div>
             </div>
-
-            <div class="voice-center">
-                <div class="control-panel">
-                    <div class="status-panel">
-                        <div class="status-item">
-                            <span class="status-label">SESSION</span>
-                            <span id="sessionInfo" class="status-value">STANDBY</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="status-label">NEURAL LINK</span>
-                            <div class="connection-status" id="connectionStatus">
-                                <div class="signal-bars">
-                                    <div class="bar"></div>
-                                    <div class="bar"></div>
-                                    <div class="bar"></div>
-                                    <div class="bar"></div>
-                                </div>
-                                <span class="connection-text">ONLINE</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="voice-activation">
-                        <div class="activation-ring">
-                            <div class="ring-outer"></div>
-                            <div class="ring-middle"></div>
-                            <div class="ring-inner"></div>
-                            
-                            <button id="recordButton" class="voice-core">
-                                <div class="core-energy"></div>
-                                <div class="core-pulse"></div>
-                                <div class="voice-icon">
-                                    <svg viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
-                                        <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
-                                        <line x1="12" y1="19" x2="12" y2="23"/>
-                                        <line x1="8" y1="23" x2="16" y2="23"/>
-                                    </svg>
-                                </div>
-                            </button>
-                        </div>
-                        
-                        <div class="activation-text">
-                            <span id="conversationStatus" class="activation-status">VOICE RECOGNITION READY</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="hud-bottom">
-            <div class="system-metrics">
-                <div class="metric">
-                    <span class="metric-label">CPU</span>
-                    <div class="metric-bar">
-                        <div class="metric-fill" style="width: 45%"></div>
-                    </div>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">MEM</span>
-                    <div class="metric-bar">
-                        <div class="metric-fill" style="width: 67%"></div>
-                    </div>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">NET</span>
-                    <div class="metric-bar">
-                        <div class="metric-fill" style="width: 89%"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        </main>
     </div>
 
     <script src="main.js"></script>
