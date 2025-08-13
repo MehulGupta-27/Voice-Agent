@@ -130,7 +130,6 @@ async def generate_murf_fallback_audio(text: str, file_path: Path) -> bool:
     try:
         import requests
         
-        # Use same Murf API settings as main TTS
         url = "https://api.murf.ai/v1/speech/generate-with-key"
         headers = {
             "accept": "application/json",
@@ -138,10 +137,9 @@ async def generate_murf_fallback_audio(text: str, file_path: Path) -> bool:
             "api-key": os.getenv("MURF_API_KEY")
         }
         
-        # Use same voice as main TTS
         payload = {
             "text": text,
-            "voiceId": "en-US-marcus",  # Same voice as your main TTS
+            "voiceId": "en-US-marcus",
             "format": "MP3"
         }
         
@@ -153,7 +151,6 @@ async def generate_murf_fallback_audio(text: str, file_path: Path) -> bool:
             audio_url = result.get("audioFile")
             
             if audio_url:
-                # Download the audio file from Murf
                 audio_response = requests.get(audio_url, timeout=30)
                 if audio_response.status_code == 200:
                     with open(file_path, 'wb') as f:
@@ -174,24 +171,21 @@ async def generate_gtts_fallback_audio(text: str) -> str:
         from gtts import gTTS
         import hashlib
         
-        # Create filename
         text_hash = hashlib.md5(text.encode()).hexdigest()[:8]
         filename = f"gtts_fallback_{text_hash}.mp3"
         file_path = fallback_audio_dir / filename
         
-        # Check if file already exists
         if file_path.exists():
             logger.info(f"Using existing gTTS fallback audio: {filename}")
             return f"http://localhost:8000/fallback-audio/{filename}"
         
         logger.info("Generating gTTS fallback with optimized settings...")
         
-        # Use gTTS with faster settings
         tts = gTTS(
             text=text, 
             lang='en', 
-            slow=False,  # Ensure fast speed
-            tld='com'    # Use .com for more natural voice
+            slow=False,
+            tld='com'
         )
         tts.save(str(file_path))
         
@@ -399,7 +393,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for fallback audio
 app.mount("/fallback-audio", StaticFiles(directory="fallback_audio"), name="fallback_audio")
 
 class TTSRequest(BaseModel):
@@ -436,10 +429,8 @@ async def generate_fallback_audio_endpoint(message: str):
     try:
         logger.info(f"Generating fallback audio for message: {message}")
         
-        # Generate the fallback audio
         audio_url = await generate_fallback_audio_url(message)
         
-        # Extract filename from URL
         filename = audio_url.split('/')[-1] if '/' in audio_url else None
         file_path = fallback_audio_dir / filename if filename else None
         
@@ -538,7 +529,6 @@ async def generate_audio(req: TTSRequest):
             }
         else:
             logger.warning(f"TTS failed, using fallback: {tts_result['error']}")
-            # Generate fallback audio with specific error message
             fallback_message = "I'm having trouble connecting right now"
             fallback_audio = await generate_fallback_audio_url(fallback_message)
             return {
@@ -730,7 +720,6 @@ async def llm_query(file: UploadFile = File(...)):
         transcription_result = await safe_transcribe(audio_data)
         
         if not transcription_result["success"]:
-            # Generate fallback audio for STT error
             fallback_message = "I'm having trouble connecting right now"
             fallback_audio = await generate_fallback_audio_url(fallback_message)
             return {
@@ -746,7 +735,6 @@ async def llm_query(file: UploadFile = File(...)):
         logger.info(f"User query: {user_query}")
         
         if not user_query or user_query.strip() == "":
-            # Generate fallback audio for no speech detected
             fallback_message = "I'm having trouble connecting right now"
             fallback_audio = await generate_fallback_audio_url(fallback_message)
             return {
@@ -777,7 +765,6 @@ async def llm_query(file: UploadFile = File(...)):
             audio_url = tts_result["audio_url"]
             tts_success = True
         else:
-            # Generate fallback audio with the specific error message
             logger.info("TTS failed, generating fallback audio with error message")
             fallback_message = "I'm having trouble connecting right now"
             audio_url = await generate_fallback_audio_url(fallback_message)
@@ -989,5 +976,156 @@ async def get_chat_history(session_id: str):
         return {
             "error": f"Chat history error: {str(e)}",
             "status": "error"
+        }
+
+@app.post("/conversation/query")
+async def conversation_query(file: UploadFile = File(...), session_id: str = None):
+    """Conversational agent endpoint with session management"""
+    try:
+        logger.info(f"Received conversation query: {file.filename}, Session: {session_id}")
+        
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="No file provided")
+        
+        audio_data = await file.read()
+        logger.info(f"Audio data size: {len(audio_data)} bytes")
+        
+        if len(audio_data) == 0:
+            raise HTTPException(status_code=400, detail="Empty audio file")
+        
+        logger.info("Step 1: Transcribing audio...")
+        transcription_result = await safe_transcribe(audio_data)
+        
+        if not transcription_result["success"]:
+            fallback_message = FALLBACK_RESPONSES["stt_error"]
+            fallback_audio = await generate_fallback_audio_url(fallback_message)
+            return {
+                "status": "error",
+                "error": transcription_result["error"],
+                "ai_response": fallback_message,
+                "audioFile": fallback_audio,
+                "session_id": session_id,
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        user_query = transcription_result["text"]
+        logger.info(f"User query: {user_query}")
+        
+        if not user_query or user_query.strip() == "":
+            fallback_message = "I didn't catch that. Could you please repeat?"
+            fallback_audio = await generate_fallback_audio_url(fallback_message)
+            return {
+                "status": "error",
+                "error": "No speech detected",
+                "ai_response": fallback_message,
+                "audioFile": fallback_audio,
+                "session_id": session_id,
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        if not session_id:
+            session_id = f"session_{int(datetime.now().timestamp())}"
+        
+        if session_id not in chat_sessions:
+            chat_sessions[session_id] = {
+                "messages": [],
+                "created_at": datetime.now().isoformat(),
+                "last_activity": datetime.now().isoformat()
+            }
+        
+        session = chat_sessions[session_id]
+        session["last_activity"] = datetime.now().isoformat()
+        
+        session["messages"].append({
+            "role": "user",
+            "content": user_query,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        logger.info("Step 2: Generating AI response with conversation context...")
+        
+        context_messages = []
+        for msg in session["messages"][-10:]:
+            context_messages.append(f"{msg['role'].title()}: {msg['content']}")
+        
+        conversation_context = "\n".join(context_messages)
+        
+        prompt = f"""You are a helpful AI assistant having a natural conversation. 
+        
+Previous conversation:
+{conversation_context}
+
+Please respond naturally and conversationally to the user's latest message. Keep your response concise but helpful."""
+        
+        llm_result = await safe_llm_generate(prompt)
+        
+        if not llm_result["success"]:
+            ai_response_text = llm_result["fallback_response"]
+            llm_success = False
+        else:
+            ai_response_text = llm_result["text"]
+            llm_success = True
+        
+        session["messages"].append({
+            "role": "assistant",
+            "content": ai_response_text,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        logger.info(f"AI response: {ai_response_text[:100]}...")
+        
+        logger.info("Step 3: Converting AI response to speech...")
+        tts_result = await safe_tts_generate(ai_response_text)
+        
+        if tts_result["success"]:
+            audio_url = tts_result["audio_url"]
+            tts_success = True
+        else:
+            logger.info("TTS failed, generating fallback audio")
+            audio_url = await generate_fallback_audio_url(ai_response_text)
+            tts_success = False
+        
+        if transcription_result["success"] and llm_success and tts_success:
+            status = "success"
+        elif transcription_result["success"]:
+            status = "partial_success"
+        else:
+            status = "fallback"
+        
+        logger.info(f"Conversation query completed with status: {status}")
+        
+        response_data = {
+            "status": status,
+            "session_id": session_id,
+            "user_query": user_query,
+            "ai_response": ai_response_text,
+            "audioFile": audio_url,
+            "voice_id": "en-US-marcus",
+            "model": "gemini-1.5-flash",
+            "message_count": len(session["messages"]),
+            "audio_duration": transcription_result.get("duration"),
+            "timestamp": datetime.now().isoformat(),
+            "service_status": {
+                "transcription": transcription_result["success"],
+                "llm": llm_success,
+                "tts": tts_success
+            }
+        }
+        
+        return response_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in conversation query: {e}")
+        fallback_message = FALLBACK_RESPONSES["general_error"]
+        fallback_audio = await generate_fallback_audio_url(fallback_message)
+        return {
+            "status": "error",
+            "error": str(e),
+            "ai_response": fallback_message,
+            "audioFile": fallback_audio,
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat()
         }
 

@@ -2,76 +2,154 @@
 <html lang="en">
 <head>
     <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>30 Days of Voice Agents - Day 11 Error Handling & Robustness</title>
+    <title>NEXUS AI - Voice Interface</title>
 </head>
 <body>
-    <div class="main">
-        <div class="header-section">
-            <h1>30 Days of Voice Agents</h1>
-            <h2>Day 11 - Error Handling & Robustness</h2>
+    <div class="matrix-bg">
+        <canvas id="matrixCanvas"></canvas>
+    </div>
+    
+    <div class="hud-overlay">
+        <div class="hud-top">
+            <div class="hud-section">
+                <div class="system-logo">
+                    <div class="logo-core"></div>
+                    <div class="logo-rings">
+                        <div class="ring ring-1"></div>
+                        <div class="ring ring-2"></div>
+                        <div class="ring ring-3"></div>
+                    </div>
+                </div>
+                <div class="system-info">
+                    <h1 class="system-title">NEXUS AI</h1>
+                    <div class="system-subtitle">NEURAL VOICE INTERFACE</div>
+                </div>
+            </div>
+            
+            <div class="hud-controls">
+                <button id="continuousMode" class="hud-btn continuous active">
+                    <div class="btn-glow"></div>
+                    <span class="btn-text">CONTINUOUS</span>
+                </button>
+                <button id="newSession" class="hud-btn primary">
+                    <div class="btn-glow"></div>
+                    <span class="btn-text">NEW SESSION</span>
+                </button>
+                <button id="clearHistory" class="hud-btn secondary">
+                    <div class="btn-glow"></div>
+                    <span class="btn-icon">⚡</span>
+                </button>
+            </div>
         </div>
 
-        <div class="content-layout">
-            <div class="section-box tts-section">
-                <div class="section-header">
-                    <h3>🎵 Text-to-Speech Generator</h3>
+        <div class="main-interface">
+            <div class="chat-display">
+                <div class="display-frame">
+                    <div class="frame-corners">
+                        <div class="corner corner-tl"></div>
+                        <div class="corner corner-tr"></div>
+                        <div class="corner corner-bl"></div>
+                        <div class="corner corner-br"></div>
+                    </div>
+                    
+                    <div id="conversationHistory" class="chat-content">
+                        <div class="ai-standby" id="emptyState">
+                            <div class="standby-visual">
+                                <div class="neural-network">
+                                    <div class="node node-center"></div>
+                                    <div class="node node-1"></div>
+                                    <div class="node node-2"></div>
+                                    <div class="node node-3"></div>
+                                    <div class="node node-4"></div>
+                                    <div class="connection con-1"></div>
+                                    <div class="connection con-2"></div>
+                                    <div class="connection con-3"></div>
+                                    <div class="connection con-4"></div>
+                                </div>
+                            </div>
+                            <div class="standby-text">
+                                <h2>AI SYSTEM READY</h2>
+                                <p>VOICE RECOGNITION ACTIVE • NEURAL PROCESSING ONLINE</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <form>
-                    <input id="textInput" placeholder="Enter Text to Convert to Speech">
-                    <button type="button" id="generateBtn">Generate Audio</button>
-                </form>
-                <div id="audioResult"></div>
             </div>
 
-            <div class="section-box voice-section">
-                <div class="section-header">
-                    <h3>🎤 Echo Bot v2 - Voice Mirroring</h3>
-                </div>
-                
-                <div class="recording-controls">
-                    <button type="button" id="startRecording">🎤 Start Recording</button>
-                    <button type="button" id="stopRecording" disabled>⏹️ Stop Recording</button>
-                </div>
-                
-                <div id="recordingResult"></div>
-                
-                <div id="uploadResults"></div>
-            </div>
+            <div class="voice-center">
+                <div class="control-panel">
+                    <div class="status-panel">
+                        <div class="status-item">
+                            <span class="status-label">SESSION</span>
+                            <span id="sessionInfo" class="status-value">STANDBY</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">NEURAL LINK</span>
+                            <div class="connection-status" id="connectionStatus">
+                                <div class="signal-bars">
+                                    <div class="bar"></div>
+                                    <div class="bar"></div>
+                                    <div class="bar"></div>
+                                    <div class="bar"></div>
+                                </div>
+                                <span class="connection-text">ONLINE</span>
+                            </div>
+                        </div>
+                    </div>
 
-            <div class="section-box llm-section">
-                <div class="section-header">
-                    <h3>🧠 Voice LLM Assistant - Speak & Get AI Responses</h3>
-                    <p>Ask questions with your voice and get spoken AI responses!</p>
+                    <div class="voice-activation">
+                        <div class="activation-ring">
+                            <div class="ring-outer"></div>
+                            <div class="ring-middle"></div>
+                            <div class="ring-inner"></div>
+                            
+                            <button id="recordButton" class="voice-core">
+                                <div class="core-energy"></div>
+                                <div class="core-pulse"></div>
+                                <div class="voice-icon">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+                                        <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                                        <line x1="12" y1="19" x2="12" y2="23"/>
+                                        <line x1="8" y1="23" x2="16" y2="23"/>
+                                    </svg>
+                                </div>
+                            </button>
+                        </div>
+                        
+                        <div class="activation-text">
+                            <span id="conversationStatus" class="activation-status">VOICE RECOGNITION READY</span>
+                        </div>
+                    </div>
                 </div>
-                
-                <div class="recording-controls">
-                    <button type="button" id="startLLMRecording">🎤 Ask AI</button>
-                    <button type="button" id="stopLLMRecording" disabled>⏹️ Stop Question</button>
-                </div>
-                
-                <div id="llmRecordingResult"></div>
-                
-                <div id="llmResults"></div>
             </div>
+        </div>
 
-            <div class="section-box conversation-section">
-                <div class="section-header">
-                    <h3>💬 Conversational Agent - Chat with Memory</h3>
-                    <p>Have a continuous conversation! The AI remembers your chat history.</p>
-                    <div id="sessionInfo" style="font-size: 12px; color: #6b7280; margin-top: 10px;"></div>
+        <div class="hud-bottom">
+            <div class="system-metrics">
+                <div class="metric">
+                    <span class="metric-label">CPU</span>
+                    <div class="metric-bar">
+                        <div class="metric-fill" style="width: 45%"></div>
+                    </div>
                 </div>
-                
-                <div class="conversation-controls">
-                    <button type="button" id="startConversation">🎤 Start Conversation</button>
-                    <button type="button" id="stopConversation" disabled>⏹️ Stop</button>
-                    <button type="button" id="newSession">🔄 New Session</button>
+                <div class="metric">
+                    <span class="metric-label">MEM</span>
+                    <div class="metric-bar">
+                        <div class="metric-fill" style="width: 67%"></div>
+                    </div>
                 </div>
-                
-                <div id="conversationStatus">Ready to start conversation...</div>
-                
-                <div id="conversationHistory"></div>
+                <div class="metric">
+                    <span class="metric-label">NET</span>
+                    <div class="metric-bar">
+                        <div class="metric-fill" style="width: 89%"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
