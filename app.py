@@ -1,4 +1,4 @@
-# Updated app.py with WebSocket support
+# Updated app.py with WebSocket Audio Streaming
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +9,8 @@ import logging.config
 from pathlib import Path
 import json
 from typing import List, Dict
+import base64
+import io
 
 # Import configurations and schemas
 import config
@@ -26,7 +28,7 @@ logging.config.dictConfig(config.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
-app = FastAPI(title="Voice AI Assistant", version="1.0.0")
+app = FastAPI(title="Voice AI Assistant with Audio Streaming", version="1.0.0")
 
 # Setup directories
 def setup_directories():
@@ -76,162 +78,241 @@ app.add_middleware(
 # Mount static files
 app.mount("/fallback-audio", StaticFiles(directory="fallback_audio"), name="fallback_audio")
 
-# WebSocket Connection Manager
-class ConnectionManager:
+# WebSocket Connection Manager for Audio Streaming
+class AudioStreamingManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
-        self.connection_info: Dict[WebSocket, Dict] = {}
+        self.active_connections: Dict[WebSocket, Dict] = {}
+        self.audio_buffers: Dict[WebSocket, io.BytesIO] = {}
 
     async def connect(self, websocket: WebSocket, client_id: str = None):
         await websocket.accept()
-        self.active_connections.append(websocket)
-        self.connection_info[websocket] = {
-            "client_id": client_id or f"client_{len(self.active_connections)}",
+        client_id = client_id or f"audio_client_{len(self.active_connections) + 1}"
+        
+        self.active_connections[websocket] = {
+            "client_id": client_id,
             "connected_at": datetime.now().isoformat(),
-            "message_count": 0
+            "chunks_received": 0,
+            "total_bytes": 0,
+            "is_recording": False,
+            "audio_filename": None
         }
-        logger.info(f"WebSocket client connected: {self.connection_info[websocket]['client_id']}")
+        
+        # Initialize audio buffer
+        self.audio_buffers[websocket] = io.BytesIO()
+        
+        logger.info(f"🎤 Audio WebSocket client connected: {client_id}")
         
         # Send welcome message
-        await self.send_personal_message({
+        await self.send_message(websocket, {
             "type": "connection",
-            "message": "Connected to Voice AI Assistant WebSocket",
-            "client_id": self.connection_info[websocket]['client_id'],
-            "timestamp": datetime.now().isoformat(),
-            "total_connections": len(self.active_connections)
-        }, websocket)
+            "message": "Connected to Audio Streaming WebSocket",
+            "client_id": client_id,
+            "timestamp": datetime.now().isoformat()
+        })
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
-            client_info = self.connection_info.get(websocket, {})
-            client_id = client_info.get("client_id", "unknown")
-            message_count = client_info.get("message_count", 0)
+            client_info = self.active_connections[websocket]
+            client_id = client_info["client_id"]
+            chunks_received = client_info["chunks_received"]
+            total_bytes = client_info["total_bytes"]
             
-            self.active_connections.remove(websocket)
-            if websocket in self.connection_info:
-                del self.connection_info[websocket]
+            logger.info(f"🎤 Audio client disconnected: {client_id} "
+                       f"(received {chunks_received} chunks, {total_bytes} bytes)")
             
-            logger.info(f"WebSocket client disconnected: {client_id} (sent {message_count} messages)")
+            # Cleanup
+            del self.active_connections[websocket]
+            if websocket in self.audio_buffers:
+                self.audio_buffers[websocket].close()
+                del self.audio_buffers[websocket]
 
-    async def send_personal_message(self, message: dict, websocket: WebSocket):
+    async def send_message(self, websocket: WebSocket, message: dict):
         try:
-            await websocket.send_text(json.dumps(message, indent=2))
-            if websocket in self.connection_info:
-                self.connection_info[websocket]["message_count"] += 1
+            await websocket.send_text(json.dumps(message))
         except Exception as e:
-            logger.error(f"Error sending message to WebSocket: {e}")
+            logger.error(f"Error sending WebSocket message: {e}")
 
-    async def broadcast(self, message: dict):
-        disconnected = []
-        for connection in self.active_connections:
-            try:
-                await connection.send_text(json.dumps(message, indent=2))
-                if connection in self.connection_info:
-                    self.connection_info[connection]["message_count"] += 1
-            except Exception as e:
-                logger.error(f"Error broadcasting to WebSocket: {e}")
-                disconnected.append(connection)
+    async def handle_audio_chunk(self, websocket: WebSocket, audio_data: bytes):
+        """Handle incoming audio chunk"""
+        if websocket not in self.active_connections:
+            return
         
-        # Clean up disconnected clients
-        for connection in disconnected:
-            self.disconnect(connection)
+        client_info = self.active_connections[websocket]
+        audio_buffer = self.audio_buffers[websocket]
+        
+        # Write chunk to buffer
+        audio_buffer.write(audio_data)
+        
+        # Update statistics
+        client_info["chunks_received"] += 1
+        client_info["total_bytes"] += len(audio_data)
+        
+        logger.info(f"📦 Received audio chunk from {client_info['client_id']}: "
+                   f"chunk #{client_info['chunks_received']}, "
+                   f"{len(audio_data)} bytes, "
+                   f"total: {client_info['total_bytes']} bytes")
+        
+        # Send acknowledgment
+        await self.send_message(websocket, {
+            "type": "chunk_received",
+            "chunk_number": client_info["chunks_received"],
+            "chunk_size": len(audio_data),
+            "total_bytes": client_info["total_bytes"],
+            "timestamp": datetime.now().isoformat()
+        })
 
-    def get_connection_stats(self):
-        return {
-            "total_connections": len(self.active_connections),
-            "connections": [
-                {
-                    "client_id": info["client_id"],
-                    "connected_at": info["connected_at"],
-                    "message_count": info["message_count"]
-                }
-                for info in self.connection_info.values()
-            ]
-        }
+    async def start_recording_session(self, websocket: WebSocket):
+        """Start a new recording session"""
+        if websocket not in self.active_connections:
+            return
+        
+        client_info = self.active_connections[websocket]
+        
+        # Reset for new recording
+        self.audio_buffers[websocket] = io.BytesIO()
+        client_info["chunks_received"] = 0
+        client_info["total_bytes"] = 0
+        client_info["is_recording"] = True
+        
+        # Generate filename for this recording session
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        client_info["audio_filename"] = f"streamed_audio_{client_info['client_id']}_{timestamp}.webm"
+        
+        logger.info(f"🎬 Started recording session for {client_info['client_id']}: {client_info['audio_filename']}")
+        
+        await self.send_message(websocket, {
+            "type": "recording_started",
+            "filename": client_info["audio_filename"],
+            "timestamp": datetime.now().isoformat()
+        })
 
-manager = ConnectionManager()
+    async def stop_recording_session(self, websocket: WebSocket):
+        """Stop recording session and save audio file"""
+        if websocket not in self.active_connections:
+            return
+        
+        client_info = self.active_connections[websocket]
+        audio_buffer = self.audio_buffers[websocket]
+        
+        client_info["is_recording"] = False
+        
+        # Save audio file
+        if client_info["audio_filename"] and audio_buffer.tell() > 0:
+            file_path = config.UPLOADS_DIR / client_info["audio_filename"]
+            
+            # Get audio data from buffer
+            audio_data = audio_buffer.getvalue()
+            
+            # Save to file
+            with open(file_path, 'wb') as f:
+                f.write(audio_data)
+            
+            file_size = len(audio_data)
+            
+            logger.info(f"💾 Saved streamed audio: {file_path} "
+                       f"({file_size} bytes, {client_info['chunks_received']} chunks)")
+            
+            await self.send_message(websocket, {
+                "type": "recording_saved",
+                "filename": client_info["audio_filename"],
+                "file_path": str(file_path),
+                "file_size": file_size,
+                "chunks_received": client_info["chunks_received"],
+                "total_duration_estimate": f"{file_size / 16000:.2f}s",  # Rough estimate
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            logger.warning(f"No audio data to save for {client_info['client_id']}")
+            await self.send_message(websocket, {
+                "type": "recording_error",
+                "error": "No audio data received",
+                "timestamp": datetime.now().isoformat()
+            })
 
-# WebSocket endpoint
+audio_manager = AudioStreamingManager()
+
+# WebSocket endpoint for audio streaming
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, client_id: str = None):
-    await manager.connect(websocket, client_id)
+    await audio_manager.connect(websocket, client_id)
     try:
         while True:
             # Receive message from client
-            data = await websocket.receive_text()
-            logger.info(f"Received WebSocket message: {data}")
+            message = await websocket.receive()
             
-            try:
-                # Try to parse as JSON
-                message_data = json.loads(data)
-                message_type = message_data.get("type", "message")
-                message_content = message_data.get("message", data)
-                client_info = manager.connection_info.get(websocket, {})
+            if message["type"] == "websocket.receive":
+                if "text" in message:
+                    # Handle text messages (control messages)
+                    try:
+                        data = json.loads(message["text"])
+                        await handle_control_message(websocket, data)
+                    except json.JSONDecodeError:
+                        # Handle plain text
+                        await handle_plain_text_message(websocket, message["text"])
                 
-                # Create response based on message type
-                if message_type == "ping":
-                    response = {
-                        "type": "pong",
-                        "message": "pong",
-                        "timestamp": datetime.now().isoformat(),
-                        "client_id": client_info.get("client_id")
-                    }
-                elif message_type == "echo":
-                    response = {
-                        "type": "echo_response",
-                        "original_message": message_content,
-                        "echo": f"Echo: {message_content}",
-                        "timestamp": datetime.now().isoformat(),
-                        "client_id": client_info.get("client_id")
-                    }
-                elif message_type == "stats":
-                    response = {
-                        "type": "stats_response",
-                        "connection_stats": manager.get_connection_stats(),
-                        "services_status": services_status.dict(),
-                        "timestamp": datetime.now().isoformat()
-                    }
-                elif message_type == "broadcast":
-                    # Broadcast message to all connected clients
-                    broadcast_msg = {
-                        "type": "broadcast",
-                        "message": message_content,
-                        "from_client": client_info.get("client_id"),
-                        "timestamp": datetime.now().isoformat()
-                    }
-                    await manager.broadcast(broadcast_msg)
-                    continue  # Don't send individual response
-                else:
-                    # Default echo behavior
-                    response = {
-                        "type": "echo",
-                        "original_message": message_data,
-                        "echo": f"Server received: {message_content}",
-                        "message_count": client_info.get("message_count", 0) + 1,
-                        "timestamp": datetime.now().isoformat(),
-                        "client_id": client_info.get("client_id")
-                    }
+                elif "bytes" in message:
+                    # Handle binary audio data
+                    audio_data = message["bytes"]
+                    await audio_manager.handle_audio_chunk(websocket, audio_data)
                     
-            except json.JSONDecodeError:
-                # Handle plain text messages
-                client_info = manager.connection_info.get(websocket, {})
-                response = {
-                    "type": "text_echo",
-                    "original_message": data,
-                    "echo": f"Server received: {data}",
-                    "message_count": client_info.get("message_count", 0) + 1,
-                    "timestamp": datetime.now().isoformat(),
-                    "client_id": client_info.get("client_id")
-                }
-            
-            # Send response back to client
-            await manager.send_personal_message(response, websocket)
-            
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        # Stop any ongoing recording before disconnect
+        if websocket in audio_manager.active_connections:
+            client_info = audio_manager.active_connections[websocket]
+            if client_info.get("is_recording", False):
+                await audio_manager.stop_recording_session(websocket)
+        audio_manager.disconnect(websocket)
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
-        manager.disconnect(websocket)
+        audio_manager.disconnect(websocket)
+
+async def handle_control_message(websocket: WebSocket, data: dict):
+    """Handle control messages (JSON)"""
+    message_type = data.get("type", "unknown")
+    client_info = audio_manager.active_connections.get(websocket, {})
+    
+    if message_type == "start_recording":
+        await audio_manager.start_recording_session(websocket)
+        
+    elif message_type == "stop_recording":
+        await audio_manager.stop_recording_session(websocket)
+        
+    elif message_type == "ping":
+        await audio_manager.send_message(websocket, {
+            "type": "pong",
+            "timestamp": datetime.now().isoformat(),
+            "client_id": client_info.get("client_id")
+        })
+        
+    elif message_type == "status":
+        await audio_manager.send_message(websocket, {
+            "type": "status_response",
+            "client_info": client_info,
+            "is_recording": client_info.get("is_recording", False),
+            "chunks_received": client_info.get("chunks_received", 0),
+            "total_bytes": client_info.get("total_bytes", 0),
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    else:
+        await audio_manager.send_message(websocket, {
+            "type": "unknown_command",
+            "received_type": message_type,
+            "available_commands": ["start_recording", "stop_recording", "ping", "status"],
+            "timestamp": datetime.now().isoformat()
+        })
+
+async def handle_plain_text_message(websocket: WebSocket, text: str):
+    """Handle plain text messages"""
+    client_info = audio_manager.active_connections.get(websocket, {})
+    
+    await audio_manager.send_message(websocket, {
+        "type": "text_echo",
+        "original_message": text,
+        "echo": f"Server received: {text}",
+        "client_id": client_info.get("client_id"),
+        "timestamp": datetime.now().isoformat()
+    })
 
 # WebSocket info endpoint
 @app.get("/ws/info", response_model=dict)
@@ -239,35 +320,43 @@ def websocket_info():
     """Get WebSocket connection information"""
     return {
         "websocket_endpoint": "/ws",
-        "connection_stats": manager.get_connection_stats(),
+        "connection_stats": {
+            "total_connections": len(audio_manager.active_connections),
+            "connections": [
+                {
+                    "client_id": info["client_id"],
+                    "connected_at": info["connected_at"],
+                    "chunks_received": info["chunks_received"],
+                    "total_bytes": info["total_bytes"],
+                    "is_recording": info["is_recording"]
+                }
+                for info in audio_manager.active_connections.values()
+            ]
+        },
         "supported_message_types": [
             {
+                "type": "start_recording",
+                "description": "Start audio recording session",
+                "example": {"type": "start_recording"}
+            },
+            {
+                "type": "stop_recording", 
+                "description": "Stop recording and save audio file",
+                "example": {"type": "stop_recording"}
+            },
+            {
                 "type": "ping",
-                "description": "Send ping, receive pong",
+                "description": "Health check ping",
                 "example": {"type": "ping"}
             },
             {
-                "type": "echo",
-                "description": "Echo a specific message",
-                "example": {"type": "echo", "message": "Hello WebSocket!"}
-            },
-            {
-                "type": "stats",
-                "description": "Get connection and service statistics",
-                "example": {"type": "stats"}
-            },
-            {
-                "type": "broadcast",
-                "description": "Broadcast message to all connected clients",
-                "example": {"type": "broadcast", "message": "Hello everyone!"}
-            },
-            {
-                "type": "message",
-                "description": "Send a regular message (default behavior)",
-                "example": {"type": "message", "message": "Hello!"}
+                "type": "status",
+                "description": "Get current recording status",
+                "example": {"type": "status"}
             }
         ],
-        "plain_text_support": True,
+        "binary_data_support": True,
+        "audio_save_location": str(config.UPLOADS_DIR.absolute()),
         "timestamp": datetime.now().isoformat()
     }
 
@@ -276,34 +365,17 @@ def generate_session_id() -> str:
     """Generate unique session ID"""
     return f"session_{int(datetime.now().timestamp())}"
 
-def create_llm_prompt(user_query: str, session_id: str) -> str:
-    """Create prompt with conversation context"""
-    conversation_context = services['session_manager'].get_conversation_context(session_id)
-    
-    if conversation_context:
-        return f"""You are a helpful AI assistant having a natural conversation. 
-
-Previous conversation:
-{conversation_context}
-
-Please respond naturally and conversationally to the user's latest message. Keep your response concise but helpful."""
-    else:
-        return f"""You are a helpful and friendly AI assistant having a natural conversation. Keep your responses conversational and engaging.
-
-User: {user_query}
-
-Please respond to the user's message naturally."""
-
-# Keep all existing API endpoints...
+# API Endpoints (keeping all existing endpoints)
 @app.get("/", response_model=dict)
 def root():
     """Root endpoint with API status"""
     return {
-        "message": "Voice AI Assistant API with WebSocket Support",
+        "message": "Voice AI Assistant API with Audio Streaming",
         "services_status": services_status.dict(),
         "websocket_endpoint": "/ws",
         "websocket_info": "/ws/info",
-        "active_websocket_connections": len(manager.active_connections),
+        "active_websocket_connections": len(audio_manager.active_connections),
+        "streaming_support": True,
         "timestamp": datetime.now().isoformat()
     }
 
@@ -317,8 +389,8 @@ def health_check():
         fallback_available=True
     )
 
-# [Keep all other existing endpoints from the original app.py - they remain unchanged]
-# For brevity, I'm not duplicating all the existing endpoints here, but they should all remain
+# [All other existing endpoints remain the same...]
+# For brevity, I'm showing just the key WebSocket functionality above
 
 if __name__ == "__main__":
     import uvicorn

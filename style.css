@@ -528,3 +528,195 @@ body {
         height: 18px;
     }
 }
+
+/* Additional styles for streaming interface - add to style.css */
+
+/* System Messages */
+.message.system .message-bubble {
+    background: rgba(52, 152, 219, 0.1) !important;
+    color: #2980b9 !important;
+    border: 1px solid rgba(52, 152, 219, 0.2) !important;
+    font-size: 13px !important;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    max-width: 85% !important;
+}
+
+/* Streaming Status Indicators */
+.status-streaming {
+    background: rgba(52, 152, 219, 0.1) !important;
+    color: #3498db !important;
+    border-color: rgba(52, 152, 219, 0.2) !important;
+    animation: streamingPulse 1.5s infinite;
+}
+
+.status-saving {
+    background: rgba(155, 89, 182, 0.1) !important;
+    color: #9b59b6 !important;
+    border-color: rgba(155, 89, 182, 0.2) !important;
+}
+
+/* WebSocket Connection Indicator */
+.connection-badge.websocket-connected {
+    color: #27ae60;
+}
+
+.connection-badge.websocket-disconnected {
+    color: #e74c3c;
+}
+
+.connection-badge.websocket-connecting {
+    color: #f39c12;
+}
+
+/* Enhanced Record Button for Streaming */
+.record-btn.streaming {
+    background: linear-gradient(45deg, #3498db, #2980b9) !important;
+    animation: streamingRecordPulse 1s infinite;
+    box-shadow: 0 0 20px rgba(52, 152, 219, 0.6);
+}
+
+/* Streaming Stats Display */
+.streaming-stats {
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.record-btn.streaming .streaming-stats {
+    opacity: 1;
+}
+
+/* Audio Progress Indicator for Streaming */
+.streaming-progress {
+    position: absolute;
+    bottom: -6px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 1px;
+    overflow: hidden;
+}
+
+.streaming-progress::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+    animation: streamingProgress 1.5s infinite;
+}
+
+/* Enhanced Message Bubbles for System Messages */
+.message.system {
+    justify-content: center;
+    margin: 8px 0;
+}
+
+.message.system .message-bubble {
+    max-width: 90%;
+    text-align: center;
+    font-weight: 500;
+}
+
+/* Connection Status Enhancement */
+.connection-badge {
+    position: relative;
+    padding: 4px 8px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.connection-badge.connected {
+    background: rgba(39, 174, 96, 0.1);
+    border-color: rgba(39, 174, 96, 0.2);
+}
+
+.connection-badge.disconnected {
+    background: rgba(231, 76, 60, 0.1);
+    border-color: rgba(231, 76, 60, 0.2);
+}
+
+/* Animations */
+@keyframes streamingPulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.02);
+        opacity: 0.8;
+    }
+}
+
+@keyframes streamingRecordPulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 4px 16px rgba(52, 152, 219, 0.4);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 8px 24px rgba(52, 152, 219, 0.6), 
+                    0 0 30px rgba(52, 152, 219, 0.3);
+    }
+}
+
+@keyframes streamingProgress {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+/* Responsive adjustments for streaming */
+@media (max-width: 768px) {
+    .message.system .message-bubble {
+        font-size: 12px;
+        max-width: 95%;
+    }
+    
+    .streaming-stats {
+        font-size: 10px;
+        top: -35px;
+    }
+}
+
+/* Enhanced recording button states */
+.record-btn {
+    position: relative;
+    overflow: hidden;
+}
+
+.record-btn.streaming::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    animation: streamingShimmer 2s infinite;
+}
+
+@keyframes streamingShimmer {
+    0% {
+        transform: translateX(-100%) rotate(45deg);
+    }
+    100% {
+        transform: translateX(100%) rotate(45deg);
+    }
+}
