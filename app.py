@@ -12,18 +12,6 @@ from typing import List, Dict
 import base64
 import io
 
-# Add these imports to the top of your app.py (after existing imports)
-import websockets
-import asyncio
-import json
-from fastapi import WebSocket, WebSocketDisconnect
-from services.streaming_service import StreamingTranscriptionService
-
-# Add this after your existing services initialization in app.py
-streaming_service = StreamingTranscriptionService()
-
-
-
 # Import configurations and schemas
 import config
 from schemas import *
@@ -278,39 +266,41 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str = None):
         logger.error(f"WebSocket error: {e}")
         audio_manager.disconnect(websocket)
 
-async def handle_audio_chunk(self, websocket: WebSocket, audio_data: bytes):
-    """Handle incoming audio chunk"""
-    if websocket not in self.active_connections:
-        return
-
-    client_info = self.active_connections[websocket]
-    audio_buffer = self.audio_buffers[websocket]
-
-    # Write chunk to buffer
-    audio_buffer.write(audio_data)
-
-    # Update statistics
-    client_info["chunks_received"] += 1
-    client_info["total_bytes"] += len(audio_data)
-
-    # NEW: Stream to AssemblyAI for real-time transcription
-    if client_info.get("is_recording", False):
-        services['stt_service'].stream_audio_chunk(audio_data)
-
-    logger.info(f"📦 Received audio chunk from {client_info['client_id']}: "
-                f"chunk #{client_info['chunks_received']}, "
-                f"{len(audio_data)} bytes, "
-                f"total: {client_info['total_bytes']} bytes")
-
-    # Send acknowledgment
-    await self.send_message(websocket, {
-        "type": "chunk_received",
-        "chunk_number": client_info["chunks_received"],
-        "chunk_size": len(audio_data),
-        "total_bytes": client_info["total_bytes"],
-        "timestamp": datetime.now().isoformat()
-    })
-
+async def handle_control_message(websocket: WebSocket, data: dict):
+    """Handle control messages (JSON)"""
+    message_type = data.get("type", "unknown")
+    client_info = audio_manager.active_connections.get(websocket, {})
+    
+    if message_type == "start_recording":
+        await audio_manager.start_recording_session(websocket)
+        
+    elif message_type == "stop_recording":
+        await audio_manager.stop_recording_session(websocket)
+        
+    elif message_type == "ping":
+        await audio_manager.send_message(websocket, {
+            "type": "pong",
+            "timestamp": datetime.now().isoformat(),
+            "client_id": client_info.get("client_id")
+        })
+        
+    elif message_type == "status":
+        await audio_manager.send_message(websocket, {
+            "type": "status_response",
+            "client_info": client_info,
+            "is_recording": client_info.get("is_recording", False),
+            "chunks_received": client_info.get("chunks_received", 0),
+            "total_bytes": client_info.get("total_bytes", 0),
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    else:
+        await audio_manager.send_message(websocket, {
+            "type": "unknown_command",
+            "received_type": message_type,
+            "available_commands": ["start_recording", "stop_recording", "ping", "status"],
+            "timestamp": datetime.now().isoformat()
+        })
 
 async def handle_plain_text_message(websocket: WebSocket, text: str):
     """Handle plain text messages"""
@@ -398,154 +388,6 @@ def health_check():
         uptime=datetime.now().isoformat(),
         fallback_available=True
     )
-
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
-        self.streaming_sessions = {}
-
-    async def connect(self, websocket: WebSocket, session_id: str):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-        self.streaming_sessions[session_id] = {
-            "websocket": websocket,
-            "streaming_service": StreamingTranscriptionService()
-        }
-        logger.info(f"✅ WebSocket connected - Session: {session_id}")
-
-    def disconnect(self, websocket: WebSocket, session_id: str):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-        if session_id in self.streaming_sessions:
-            del self.streaming_sessions[session_id]
-        logger.info(f"🔴 WebSocket disconnected - Session: {session_id}")
-
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
-
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
-
-manager = ConnectionManager()
-
-@app.websocket("/ws/stream/{session_id}")
-async def websocket_streaming_endpoint(websocket: WebSocket, session_id: str):
-    """WebSocket endpoint for real-time audio streaming and transcription"""
-    await manager.connect(websocket, session_id)
-    
-    try:
-        # Callback function for transcription results
-        async def on_transcript_callback(transcript_data):
-            """Send transcription results back to client"""
-            try:
-                message = {
-                    "type": "transcription",
-                    "data": transcript_data,
-                    "session_id": session_id,
-                    "timestamp": datetime.now().isoformat()
-                }
-                await manager.send_personal_message(json.dumps(message), websocket)
-                
-                # Print to console for demonstration
-                transcript_type = transcript_data.get("type", "unknown")
-                transcript_text = transcript_data.get("text", "")
-                print(f"🎯 [{transcript_type.upper()}] Session {session_id}: {transcript_text}")
-                
-            except Exception as e:
-                logger.error(f"Error in transcript callback: {e}")
-        
-        # Start streaming transcription
-        streaming_service = manager.streaming_sessions[session_id]["streaming_service"]
-        success = await streaming_service.start_streaming_transcription(on_transcript_callback)
-        
-        if not success:
-            await manager.send_personal_message(
-                json.dumps({"type": "error", "message": "Failed to start streaming transcription"}), 
-                websocket
-            )
-            return
-        
-        # Send confirmation to client
-        await manager.send_personal_message(
-            json.dumps({
-                "type": "ready", 
-                "message": "Streaming transcription ready",
-                "session_id": session_id
-            }), 
-            websocket
-        )
-        
-        print(f"🎤 STREAMING SESSION STARTED: {session_id}")
-        print("=" * 60)
-        print("Real-time transcription will appear below:")
-        print("=" * 60)
-        
-        while True:
-            # Receive audio data from client
-            data = await websocket.receive()
-            
-            if data["type"] == "websocket.receive":
-                if "bytes" in data:
-                    # Binary audio data
-                    audio_data = data["bytes"]
-                    await streaming_service.send_audio_data(audio_data)
-                    
-                elif "text" in data:
-                    # Text message (control commands)
-                    message = json.loads(data["text"])
-                    
-                    if message.get("type") == "stop":
-                        print(f"🛑 STOPPING STREAM: {session_id}")
-                        await streaming_service.stop_streaming()
-                        break
-                        
-                    elif message.get("type") == "ping":
-                        await manager.send_personal_message(
-                            json.dumps({"type": "pong", "session_id": session_id}), 
-                            websocket
-                        )
-    
-    except WebSocketDisconnect:
-        logger.info(f"WebSocket disconnected: {session_id}")
-    except Exception as e:
-        logger.error(f"WebSocket error: {e}")
-        await manager.send_personal_message(
-            json.dumps({"type": "error", "message": str(e)}), 
-            websocket
-        )
-    finally:
-        # Clean up
-        if session_id in manager.streaming_sessions:
-            streaming_service = manager.streaming_sessions[session_id]["streaming_service"]
-            await streaming_service.stop_streaming()
-        
-        manager.disconnect(websocket, session_id)
-        print(f"🔴 STREAMING SESSION ENDED: {session_id}")
-
-@app.get("/stream/test/{session_id}")
-async def test_streaming_endpoint(session_id: str):
-    """Test endpoint to check streaming service availability"""
-    try:
-        test_service = StreamingTranscriptionService()
-        
-        return {
-            "status": "success",
-            "message": "Streaming service test",
-            "session_id": session_id,
-            "service_available": test_service.is_available(),
-            "websocket_url": f"ws://localhost:8000/ws/stream/{session_id}",
-            "instructions": {
-                "connect": "Connect to the WebSocket URL above",
-                "audio_format": "Send audio as binary data in 16kHz, 16-bit, mono PCM format",
-                "controls": "Send JSON messages with type 'stop' to end streaming"
-            },
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Streaming test error: {e}")
-        raise HTTPException(status_code=500, detail=f"Streaming test failed: {str(e)}")
 
 # [All other existing endpoints remain the same...]
 # For brevity, I'm showing just the key WebSocket functionality above
