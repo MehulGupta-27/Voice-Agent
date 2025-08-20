@@ -182,73 +182,78 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    async function startStreamingRecording() {
-        try {
-            if (!websocket || websocket.readyState !== WebSocket.OPEN) {
-                updateStatus("WebSocket not connected", "status-error");
-                return;
-            }
-
-            updateStatus("Starting microphone for streaming...", "status-processing");
-            
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    sampleRate: 44100
-                } 
-            });
-            
-            // Send start recording command
-            websocket.send(JSON.stringify({"type": "start_recording"}));
-            
-            // Setup MediaRecorder for streaming
-            mediaRecorder = new MediaRecorder(stream, {
-                mimeType: 'audio/webm;codecs=opus',
-                audioBitsPerSecond: 128000
-            });
-            
-            streamingStats.recordingStartTime = Date.now();
-            streamingStats.chunksStreamed = 0;
-            streamingStats.totalBytesStreamed = 0;
-            
-            mediaRecorder.ondataavailable = function(event) {
-                if (event.data.size > 0 && websocket && websocket.readyState === WebSocket.OPEN) {
-                    // Convert blob to array buffer and send as binary data
-                    event.data.arrayBuffer().then(buffer => {
-                        websocket.send(buffer);
-                        console.log(`📤 Sent audio chunk: ${buffer.byteLength} bytes`);
-                    });
-                }
-            };
-            
-            mediaRecorder.onstop = function() {
-                console.log("🛑 MediaRecorder stopped");
-                stream.getTracks().forEach(track => track.stop());
-                
-                // Send stop recording command
-                if (websocket && websocket.readyState === WebSocket.OPEN) {
-                    websocket.send(JSON.stringify({"type": "stop_recording"}));
-                }
-            };
-            
-            mediaRecorder.onerror = function(error) {
-                console.error("MediaRecorder error:", error);
-                updateStatus("Recording error", "status-error");
-            };
-            
-            // Start recording with small timeslices for real-time streaming
-            mediaRecorder.start(100); // Send chunk every 100ms
-            isRecording = true;
-            
-            recordButton.classList.add("recording");
-            updateStatus("🎤 Streaming audio in real-time... tap to stop", "status-recording");
-            
-        } catch (error) {
-            console.error("Error starting streaming recording:", error);
-            updateStatus("Microphone access denied or WebSocket error", "status-error");
+async function startStreamingRecording() {
+    try {
+        if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+            updateStatus("WebSocket not connected", "status-error");
+            return;
         }
+
+        updateStatus("Starting microphone for streaming...", "status-processing");
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                sampleRate: 16000,  // 16kHz for AssemblyAI
+                channelCount: 1     // Mono
+            }
+        });
+
+        // Send start recording command
+        websocket.send(JSON.stringify({"type": "start_recording"}));
+
+        // Setup MediaRecorder for streaming
+        let mimeType = 'audio/webm;codecs=pcm';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'audio/webm;codecs=opus';
+        }
+
+        mediaRecorder = new MediaRecorder(stream, {
+            mimeType: mimeType,
+            audioBitsPerSecond: 16000  // Lower bitrate for 16kHz
+        });
+
+        streamingStats.recordingStartTime = Date.now();
+        streamingStats.chunksStreamed = 0;
+        streamingStats.totalBytesStreamed = 0;
+
+        mediaRecorder.ondataavailable = function(event) {
+            if (event.data.size > 0 && websocket && websocket.readyState === WebSocket.OPEN) {
+                // Convert blob to array buffer and send as binary data
+                event.data.arrayBuffer().then(buffer => {
+                    websocket.send(buffer);
+                    console.log(`📤 Sent audio chunk: ${buffer.byteLength} bytes`);
+                });
+            }
+        };
+
+        mediaRecorder.onstop = function() {
+            console.log("🛑 MediaRecorder stopped");
+            stream.getTracks().forEach(track => track.stop());
+            // Send stop recording command
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send(JSON.stringify({"type": "stop_recording"}));
+            }
+        };
+
+        mediaRecorder.onerror = function(error) {
+            console.error("MediaRecorder error:", error);
+            updateStatus("Recording error", "status-error");
+        };
+
+        // Start recording with small timeslices for real-time streaming
+        mediaRecorder.start(100); // Send chunk every 100ms
+
+        isRecording = true;
+        recordButton.classList.add("recording");
+        updateStatus("🎤 Streaming audio in real-time... tap to stop", "status-recording");
+
+    } catch (error) {
+        console.error("Error starting streaming recording:", error);
+        updateStatus("Microphone access denied or WebSocket error", "status-error");
     }
+}
+
 
     function stopStreamingRecording() {
         if (mediaRecorder && mediaRecorder.state !== "inactive") {

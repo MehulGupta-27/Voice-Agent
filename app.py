@@ -266,41 +266,39 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str = None):
         logger.error(f"WebSocket error: {e}")
         audio_manager.disconnect(websocket)
 
-async def handle_control_message(websocket: WebSocket, data: dict):
-    """Handle control messages (JSON)"""
-    message_type = data.get("type", "unknown")
-    client_info = audio_manager.active_connections.get(websocket, {})
-    
-    if message_type == "start_recording":
-        await audio_manager.start_recording_session(websocket)
-        
-    elif message_type == "stop_recording":
-        await audio_manager.stop_recording_session(websocket)
-        
-    elif message_type == "ping":
-        await audio_manager.send_message(websocket, {
-            "type": "pong",
-            "timestamp": datetime.now().isoformat(),
-            "client_id": client_info.get("client_id")
-        })
-        
-    elif message_type == "status":
-        await audio_manager.send_message(websocket, {
-            "type": "status_response",
-            "client_info": client_info,
-            "is_recording": client_info.get("is_recording", False),
-            "chunks_received": client_info.get("chunks_received", 0),
-            "total_bytes": client_info.get("total_bytes", 0),
-            "timestamp": datetime.now().isoformat()
-        })
-        
-    else:
-        await audio_manager.send_message(websocket, {
-            "type": "unknown_command",
-            "received_type": message_type,
-            "available_commands": ["start_recording", "stop_recording", "ping", "status"],
-            "timestamp": datetime.now().isoformat()
-        })
+async def handle_audio_chunk(self, websocket: WebSocket, audio_data: bytes):
+    """Handle incoming audio chunk"""
+    if websocket not in self.active_connections:
+        return
+
+    client_info = self.active_connections[websocket]
+    audio_buffer = self.audio_buffers[websocket]
+
+    # Write chunk to buffer
+    audio_buffer.write(audio_data)
+
+    # Update statistics
+    client_info["chunks_received"] += 1
+    client_info["total_bytes"] += len(audio_data)
+
+    # NEW: Stream to AssemblyAI for real-time transcription
+    if client_info.get("is_recording", False):
+        services['stt_service'].stream_audio_chunk(audio_data)
+
+    logger.info(f"📦 Received audio chunk from {client_info['client_id']}: "
+                f"chunk #{client_info['chunks_received']}, "
+                f"{len(audio_data)} bytes, "
+                f"total: {client_info['total_bytes']} bytes")
+
+    # Send acknowledgment
+    await self.send_message(websocket, {
+        "type": "chunk_received",
+        "chunk_number": client_info["chunks_received"],
+        "chunk_size": len(audio_data),
+        "total_bytes": client_info["total_bytes"],
+        "timestamp": datetime.now().isoformat()
+    })
+
 
 async def handle_plain_text_message(websocket: WebSocket, text: str):
     """Handle plain text messages"""
