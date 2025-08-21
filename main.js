@@ -526,83 +526,19 @@ async function startStreaming() {
     }
 
     // FIXED: Enhanced message handling for live transcription
-    function handleStreamingMessage(data) {
-        console.log('📨 Universal-Streaming received:', data);
-        
-        switch (data.status) {
-            case 'ready':
-                console.log('✅ Universal-Streaming service ready');
-                updateStatus("🎙️ Universal-Streaming ready - speak now!", "status-streaming");
-                break;
+function handleStreamingMessage(data) {
+  if (data.status !== 'transcript') return;
 
-            case 'session_opened':
-                console.log('🎙️ Universal-Streaming session opened:', data.session_id);
-                updateStatus("🎙️ Universal-Streaming session active", "status-streaming");
-                break;
+  // Final, formatted transcript: display in live field and log once
+  if (data.message_type === 'FinalTranscript' && data.turn_is_formatted) {
+    transcriptText.textContent = data.text;
+    addMessage("user", data.text);
+    conversationCount++;
+    updateSessionInfo();
+  }
+}
 
-            case 'transcript':
-                console.log('📝 Transcript received:', data);
-                
-                if (data.message_type === 'FinalTranscript') {
-                    console.log('🎯 FINAL TRANSCRIPT (Universal-Streaming):', data.text);
-                    
-                    // FIXED: Update final transcript display
-                    if (transcriptText) {
-                        const currentText = transcriptText.textContent;
-                        const newText = currentText === 'Waiting for speech...' ? 
-                            data.text : 
-                            currentText + (currentText ? ' ' : '') + data.text;
-                        transcriptText.textContent = newText;
-                        transcriptText.style.fontWeight = 'bold';
-                        transcriptText.style.color = '#2c3e50';
-                    }
-                    
-                    // Clear partial transcript
-                    if (partialTranscript) {
-                        partialTranscript.textContent = '';
-                    }
 
-                    // Add message to conversation
-                    addMessage("user", data.text);
-                    conversationCount++;
-                    updateSessionInfo();
-                    
-                } else if (data.message_type === 'PartialTranscript') {
-                    console.log('📝 PARTIAL (Universal-Streaming):', data.text);
-                    
-                    // FIXED: Update partial transcript display
-                    if (partialTranscript) {
-                        partialTranscript.textContent = data.text;
-                        partialTranscript.style.fontStyle = 'italic';
-                        partialTranscript.style.color = '#7f8c8d';
-                    }
-                }
-                break;
-
-            case 'error':
-                console.error('❌ Universal-Streaming error:', data.error || data.message);
-                updateStatus("Universal-Streaming error: " + (data.error || data.message), "status-error");
-                break;
-
-            case 'session_closed':
-                console.log('🔴 Universal-Streaming session closed');
-                if (isStreaming) {
-                    stopStreaming();
-                }
-                break;
-
-            case 'force_endpoint_sent':
-                console.log('🔄 Force endpoint sent to Universal-Streaming');
-                break;
-
-            case 'pong':
-                console.log('🏓 Universal-Streaming pong received');
-                break;
-
-            default:
-                console.log('📨 Unknown Universal-Streaming message:', data);
-        }
-    }
 
     // MESSAGE DISPLAY FUNCTIONS
     function addMessage(sender, text, audioUrl = null, isWelcome = false) {
