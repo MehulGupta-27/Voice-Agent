@@ -1,65 +1,95 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="stylesheet" href="style.css">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Assistant</title>
+    <title>Voice AI Assistant</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <header class="header">
+        <!-- Header -->
+        <div class="header">
             <div class="header-content">
-                <h1>Voice Assistant</h1>
-                <p>Speak naturally, get intelligent responses</p>
+                <h1>Voice AI Assistant</h1>
+                <p>Speak naturally and get AI-powered responses with voice</p>
             </div>
             <div class="header-actions">
-                <button id="newSession" class="btn btn-primary">
-                    New Chat
+                <button id="newSession" class="btn btn-secondary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 3v18M3 12h18"/>
+                    </svg>
+                    New Session
                 </button>
                 <button id="clearHistory" class="btn btn-secondary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                    </svg>
                     Clear
                 </button>
             </div>
-        </header>
+        </div>
 
-        <main class="main">
+        <!-- Main Content -->
+        <div class="main">
             <div class="chat-area">
-                <div id="conversationHistory" class="messages">
+                <div class="messages" id="conversationHistory">
+                    <!-- Empty state -->
                     <div class="empty-state" id="emptyState">
                         <h3>Ready to chat!</h3>
                         <p>Press the microphone button below to start a conversation</p>
                     </div>
                 </div>
+                
+                <!-- FIXED: Live Transcription Section - Make sure this is visible -->
+                <div class="streaming-transcript" id="streamingTranscript" style="display: none;">
+                    <h4>🎙️ Live Transcription:</h4>
+                    <div class="transcript-text" id="transcriptText">Waiting for speech...</div>
+                    <div class="partial-transcript" id="partialTranscript">Partial transcripts will appear here</div>
+                </div>
             </div>
 
+            <!-- Input Area -->
             <div class="input-area">
                 <div class="input-container">
                     <div class="session-status">
-                        <span id="sessionInfo" class="session-text">Ready to chat</span>
+                        <span class="session-text" id="sessionInfo">Session • 0 messages</span>
                         <div class="connection-badge" id="connectionStatus">
                             <div class="connection-dot"></div>
-                            <span>Online</span>
+                            <span>Offline</span>
                         </div>
                     </div>
-                    
+
+                    <!-- Voice Input -->
                     <div class="voice-input">
-                        <button id="recordButton" class="record-btn">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4z"/>
-                                <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
-                                <line x1="12" y1="19" x2="12" y2="23"/>
-                                <line x1="8" y1="23" x2="16" y2="23"/>
+                        <button id="recordButton" class="record-btn" title="Record Message">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V21H8v2h8v-2h-3v-.06A9 9 0 0 0 21 12v-2h-2z"/>
+                            </svg>
+                        </button>
+                        
+                        <button id="streamingButton" class="streaming-btn" title="Start Live Transcription">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                             </svg>
                         </button>
                     </div>
 
+                    <!-- Status Display -->
                     <div class="status-display">
-                        <span id="conversationStatus" class="status-text">Ready to start conversation</span>
+                        <span class="status-text" id="conversationStatus">Ready to chat</span>
+                    </div>
+                    
+                    <!-- FIXED: Add streaming status indicator -->
+                    <div class="streaming-status" id="streamingStatus" style="display: none;">
+                        <div class="status-indicator">
+                            <div class="pulse-dot"></div>
+                            <span id="streamingStatusText">🎙️ Streaming active - speak now!</span>
+                        </div>
                     </div>
                 </div>
             </div>
-        </main>
+        </div>
     </div>
 
     <script src="main.js"></script>
